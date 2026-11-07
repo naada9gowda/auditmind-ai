@@ -1,0 +1,2334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AuditMind AI — Continuous Compliance & Hindsight Memory Assurance Platform</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdfa', 100: '#ccfbf1', 200: '#99f6e4', 500: '#14b8a6', 600: '#0d9488', 700: '#0f766e', 800: '#115e59', 900: '#134e4a'
+            },
+            navy: {
+              50: '#f8fafc', 100: '#f1f5f9', 700: '#334155', 800: '#1e293b', 900: '#0f172a', 950: '#020617'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- React 18 & ReactDOM 18 CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel Standalone for in-browser JSX compilation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-in { animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    @keyframes slideRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    .animate-slide-right { animation: slideRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // =========================================================================
+    // 1. SEED USERS & ROLE PERMISSION DEFINITIONS
+    // =========================================================================
+    const SEED_USERS = [
+      {
+        id: 'usr-admin',
+        name: 'Alice Admin',
+        email: 'alice.admin@abctech.example',
+        role: 'admin',
+        roleLabel: 'Administrator',
+        title: 'System & Security Administrator',
+        department: 'Governance & Security',
+        badgeClass: 'bg-purple-100 text-purple-900 border-purple-300',
+        permissionsDesc: 'Superuser: full authority to configure controls, approve AI findings, sign off completed remediations, and execute system overrides.'
+      },
+      {
+        id: 'usr-compliance',
+        name: 'Carlos Compliance',
+        email: 'carlos.compliance@abctech.example',
+        role: 'compliance_officer',
+        roleLabel: 'Compliance Officer',
+        title: 'Chief Compliance Officer',
+        department: 'Compliance & Risk',
+        badgeClass: 'bg-teal-100 text-teal-900 border-teal-300',
+        permissionsDesc: 'Compliance Authority: authorized to approve AI draft findings, verify evidence assessments, sign off remediations as Completed, and update control register statuses.'
+      },
+      {
+        id: 'usr-owner',
+        name: 'Owen Owner',
+        email: 'owen.owner@abctech.example',
+        role: 'control_owner',
+        roleLabel: 'Control Owner',
+        title: 'IT Operations Manager',
+        department: 'IT Operations',
+        badgeClass: 'bg-blue-100 text-blue-900 border-blue-300',
+        permissionsDesc: 'Control Owner (IT Ops): responsible for executing assigned remediations and submitting evidence. Finding approval and final remediation closure are strictly RESTRICTED.'
+      },
+      {
+        id: 'usr-auditor',
+        name: 'Audrey Auditor',
+        email: 'audrey.auditor@abctech.example',
+        role: 'auditor',
+        roleLabel: 'Internal Auditor',
+        title: 'Lead Internal Auditor',
+        department: 'Internal Audit',
+        badgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
+        permissionsDesc: 'Independent Auditor: independent audit oversight (Read-Only on remediations and control status changes). Can verify evidence, inspect timelines, and query assistant.'
+      }
+    ];
+
+    // =========================================================================
+    // 2. COMPLETE 20-CONTROL REGISTER (ISO/IEC 27001-INSPIRED)
+    // =========================================================================
+    const INITIAL_CONTROLS = [
+      { id: 'c1', control_code: 'SEC-001', title: 'Information Security Policy', owner: 'Chief Information Security Officer', cadence: 'annual', status: 'Compliant', evidence_expectation: 'Signed security policy document with annual review date.' },
+      { id: 'c2', control_code: 'SEC-002', title: 'Access Control Policy', owner: 'IT Operations Manager', cadence: 'annual', status: 'Compliant', evidence_expectation: 'Approved access control policy document with version history.' },
+      { id: 'c3', control_code: 'SEC-003', title: 'Cryptographic Controls', owner: 'IT Operations Manager', cadence: 'annual', status: 'Needs Review', evidence_expectation: 'Encryption cipher inventory and production key rotation records.' },
+      { id: 'c4', control_code: 'SEC-004', title: 'Physical Security Perimeter', owner: 'Facilities Manager', cadence: 'semi-annual', status: 'Compliant', evidence_expectation: 'Badge logs and physical security inspection records.' },
+      { id: 'c5', control_code: 'SEC-005', title: 'Workstation Security', owner: 'IT Support Lead', cadence: 'quarterly', status: 'Compliant', evidence_expectation: 'Endpoint management disk encryption compliance report.' },
+      { id: 'c6', control_code: 'SEC-006', title: 'Mobile Device Management', owner: 'IT Operations Manager', cadence: 'quarterly', status: 'Compliant', evidence_expectation: 'MDM enrollment statistics and compliance verification.' },
+      { id: 'c7', control_code: 'SEC-007', title: 'Privileged Access Management', owner: 'IT Operations Manager', cadence: 'monthly', status: 'Needs Review', evidence_expectation: 'Monthly PAM vault access logs and approval justifications.' },
+      { id: 'c8', control_code: 'SEC-008', title: 'Third-Party Risk Management', owner: 'Procurement Manager', cadence: 'annual', status: 'Not Assessed', evidence_expectation: 'Vendor risk questionnaires and SOC 2 report evaluations.' },
+      { id: 'c9', control_code: 'SEC-009', title: 'Information Asset Register', owner: 'Chief Information Security Officer', cadence: 'semi-annual', status: 'Compliant', evidence_expectation: 'Asset inventory with classification labels and assigned owners.' },
+      { id: 'c10', control_code: 'SEC-010', title: 'Incident Response Procedure', owner: 'Security Operations Lead', cadence: 'annual', status: 'Compliant', evidence_expectation: 'IR test tabletop exercise report and post-mortem logs.' },
+      { id: 'c11', control_code: 'SEC-011', title: 'Backup & Recovery Testing', owner: 'IT Operations Manager', cadence: 'quarterly', status: 'Compliant', evidence_expectation: 'Quarterly backup restore test sign-off certificates.' },
+      { id: 'c12', control_code: 'SEC-012', title: 'Network Segmentation', owner: 'Network Engineering Lead', cadence: 'semi-annual', status: 'Compliant', evidence_expectation: 'Firewall architecture diagram and VLAN rule audit export.' },
+      { id: 'c13', control_code: 'SEC-013', title: 'Vulnerability Management', owner: 'IT Operations Manager', cadence: 'monthly', status: 'Gap Identified', evidence_expectation: 'Monthly vulnerability scan reports and SLA patch tracking report.' },
+      { id: 'c14', control_code: 'SEC-014', title: 'Employee Access Reviews', owner: 'IT Operations Manager', cadence: 'quarterly', status: 'Needs Review', evidence_expectation: 'Signed quarterly access review spreadsheets covering all privileged and SaaS users.' },
+      { id: 'c15', control_code: 'SEC-015', title: 'Security Awareness & Training', owner: 'HR Manager', cadence: 'annual', status: 'Compliant', evidence_expectation: 'LMS completion records verifying >90% completion rate.' },
+      { id: 'c16', control_code: 'SEC-016', title: 'Data Classification & Handling', owner: 'Chief Information Security Officer', cadence: 'annual', status: 'Not Assessed', evidence_expectation: 'Data tagging schemas and DLP policy enforcement logs.' },
+      { id: 'c17', control_code: 'SEC-017', title: 'Change Management Procedure', owner: 'Engineering VP', cadence: 'monthly', status: 'Compliant', evidence_expectation: 'CAB meeting minutes and production pull-request approvals.' },
+      { id: 'c18', control_code: 'SEC-018', title: 'Logging & Monitoring', owner: 'Security Operations Lead', cadence: 'continuous', status: 'Compliant', evidence_expectation: 'SIEM retention logs and alert triage review reports.' },
+      { id: 'c19', control_code: 'SEC-019', title: 'Business Continuity Plan', owner: 'Operations Director', cadence: 'annual', status: 'Compliant', evidence_expectation: 'Annual BCP simulation test report and contact verification.' },
+      { id: 'c20', control_code: 'SEC-020', title: 'Secure Software Development', owner: 'Engineering VP', cadence: 'continuous', status: 'Compliant', evidence_expectation: 'SAST/DAST pipeline scan results and dependency checks.' }
+    ];
+
+    // =========================================================================
+    // 3. SEED FINDINGS (WITH RECURRENCE MATCHES & AI DRAFT STATUS)
+    // =========================================================================
+    const INITIAL_FINDINGS = [
+      {
+        id: 'f-101',
+        control_id: 'c14',
+        control_code: 'SEC-014',
+        department: 'IT Operations',
+        severity: 'High',
+        description: 'Quarterly user access rights review for privileged database accounts overdue by 45 days.',
+        status: 'Open',
+        review_status: 'Draft',
+        ai_generated: true,
+        is_recurrence: true,
+        audit_cycle: 'Cycle 3 (July 2026)',
+        source_doc: '2026_Q2_Access_Audit_Report.pdf',
+        source_page: 14,
+        source_excerpt: 'The quarterly review of administrative database access for the core banking ledger was not performed in Q1 2026. Prior cycle findings from Q4 2025 and Q1 2026 indicated repeated access recertification non-compliance.',
+        recurrence_match: {
+          score: 9.1,
+          matchedFinding: 'Jan 2026 Audit (f-088): Incomplete access reviews across core ledger',
+          reason: 'Same control (SEC-014), identical operational unit (IT Operations), repeated SLA failure to produce signed privileged user recertifications.'
+        }
+      },
+      {
+        id: 'f-102',
+        control_id: 'c13',
+        control_code: 'SEC-013',
+        department: 'Engineering',
+        severity: 'High',
+        description: 'Critical patch CVE-2026-4412 remains unapplied on production gateway proxy node gw-prod-02 past 14-day SLA.',
+        status: 'In Remediation',
+        review_status: 'Approved',
+        ai_generated: false,
+        is_recurrence: false,
+        audit_cycle: 'Cycle 3 (July 2026)',
+        source_doc: 'SecOps_Vulnerability_Scan_Report.pdf',
+        source_page: 3,
+        source_excerpt: 'Scanner identified CVE-2026-4412 with CVSS 9.2 on reverse proxy node gw-prod-02. Remediation SLA target was 14 days, currently standing at day 24 without exception waiver.'
+      },
+      {
+        id: 'f-103',
+        control_id: 'c3',
+        control_code: 'SEC-003',
+        department: 'Finance',
+        severity: 'Medium',
+        description: 'Legacy payment processing system exports ledger backups using deprecated 3DES encryption cipher.',
+        status: 'Open',
+        review_status: 'Draft',
+        ai_generated: true,
+        is_recurrence: false,
+        audit_cycle: 'Cycle 3 (July 2026)',
+        source_doc: 'Finance_Infrastructure_Review.pdf',
+        source_page: 8,
+        source_excerpt: 'Nightly backup cron export_archive.sh utilizes deprecated 3DES-CBC mode without AES-256 GCM encryption envelope.'
+      },
+      {
+        id: 'f-104',
+        control_id: 'c7',
+        control_code: 'SEC-007',
+        department: 'IT Operations',
+        severity: 'Medium',
+        description: 'Shared break-glass root credential password in PAM vault has not been rotated post emergency access event.',
+        status: 'In Remediation',
+        review_status: 'Approved',
+        ai_generated: false,
+        is_recurrence: true,
+        audit_cycle: 'Cycle 3 (July 2026)',
+        source_doc: 'Privileged_Access_Review_Q2.pdf',
+        source_page: 6,
+        source_excerpt: 'Break-glass password used on May 12 during network incident was not auto-rotated. PAM policy requires rotation within 24 hours of session termination.'
+      },
+      {
+        id: 'f-105',
+        control_id: 'c15',
+        control_code: 'SEC-015',
+        department: 'HR',
+        severity: 'Low',
+        description: 'Contractor security awareness onboarding completion rate stands at 82% against mandated 90% benchmark.',
+        status: 'Ready for Review',
+        review_status: 'Approved',
+        ai_generated: false,
+        is_recurrence: false,
+        audit_cycle: 'Cycle 3 (July 2026)',
+        source_doc: 'HR_Training_Compliance_Q1.pdf',
+        source_page: 2,
+        source_excerpt: 'Total contractor population: 142. Completed mandatory cyber hygiene: 116 (81.7%). Compliance policy requires >90% active staff completion.'
+      }
+    ];
+
+    // =========================================================================
+    // 4. SEED REMEDIATION ACTIONS (ROLE-GOVERNED)
+    // =========================================================================
+    const INITIAL_REMEDIATIONS = [
+      {
+        id: 'rem-1',
+        finding_id: 'f-101',
+        control_code: 'SEC-014',
+        owner: 'Owen Owner',
+        action: 'Execute privileged database user recertification and submit signed approval matrix',
+        due_date: '2026-05-15',
+        status: 'In Progress',
+        is_overdue: true,
+        evidence_note: 'Attach signed spreadsheet and IT Director sign-off letter',
+        department: 'IT Operations'
+      },
+      {
+        id: 'rem-2',
+        finding_id: 'f-102',
+        control_code: 'SEC-013',
+        owner: 'Owen Owner',
+        action: 'Deploy kernel hotfix and gateway proxy restart in scheduled maintenance window',
+        due_date: '2026-08-01',
+        status: 'Planned',
+        is_overdue: false,
+        evidence_note: 'Provide vulnerability scan confirmation showing patch applied',
+        department: 'Engineering'
+      },
+      {
+        id: 'rem-3',
+        finding_id: 'f-104',
+        control_code: 'SEC-007',
+        owner: 'Owen Owner',
+        action: 'Trigger manual emergency password rotation in CyberArk PAM vault',
+        due_date: '2026-07-20',
+        status: 'Ready for Review',
+        is_overdue: false,
+        evidence_note: 'PAM audit log export showing password regeneration timestamp',
+        department: 'IT Operations'
+      },
+      {
+        id: 'rem-4',
+        finding_id: 'f-105',
+        control_code: 'SEC-015',
+        owner: 'Sarah HR',
+        action: 'Send automated escalation reminders and hold contractor completion drive',
+        due_date: '2026-04-20',
+        status: 'Completed',
+        is_overdue: false,
+        evidence_note: 'LMS completion report showing 93.4% achieved on April 18',
+        department: 'HR'
+      }
+    ];
+
+    // =========================================================================
+    // 5. SEED EVIDENCE ITEMS (WITH EXACT 5 BLUEPRINT BADGES)
+    // =========================================================================
+    const INITIAL_EVIDENCE = [
+      {
+        id: 'ev-1',
+        control_id: 'c14',
+        control_code: 'SEC-014',
+        control_title: 'Employee Access Reviews',
+        doc_name: '2026_Q2_Access_Audit_Report.pdf',
+        page_number: 14,
+        assessment: 'Incomplete', // Blueprint Badge
+        review_status: 'Draft',
+        evidence_date: '2026-05-01',
+        excerpt: 'Quarterly review spreadsheet contains 45 entries for IT admins but lacks HR sign-off on 3 terminated contractors.',
+        reasons: ['Missing manager signatures', 'Terminated contractor accounts still present on active access list']
+      },
+      {
+        id: 'ev-2',
+        control_id: 'c1',
+        control_code: 'SEC-001',
+        control_title: 'Information Security Policy',
+        doc_name: 'ABC_Tech_Security_Policy_v4.pdf',
+        page_number: 1,
+        assessment: 'Candidate Match', // Blueprint Badge
+        review_status: 'Approved',
+        evidence_date: '2026-01-10',
+        excerpt: 'Signed InfoSec Policy v4.0 approved by CEO and CISO on 10 January 2026 with next scheduled annual review in Jan 2027.',
+        reasons: ['Current effective date', 'Contains executive signature matrix', 'Covers required ISO 27001 scopes']
+      },
+      {
+        id: 'ev-3',
+        control_id: 'c13',
+        control_code: 'SEC-013',
+        control_title: 'Vulnerability Management',
+        doc_name: 'SecOps_Vulnerability_Scan_Report.pdf',
+        page_number: 3,
+        assessment: 'Missing', // Blueprint Badge
+        review_status: 'Draft',
+        evidence_date: '2026-06-15',
+        excerpt: 'Critical patch remediation verification log for CVE-2026-4412 is absent from repository.',
+        reasons: ['No post-remediation patch scan available', 'Production node remains unverified']
+      },
+      {
+        id: 'ev-4',
+        control_id: 'c11',
+        control_code: 'SEC-011',
+        control_title: 'Backup & Recovery Testing',
+        doc_name: 'Disaster_Recovery_Drill_Report_2025.pdf',
+        page_number: 5,
+        assessment: 'Expired', // Blueprint Badge
+        review_status: 'Draft',
+        evidence_date: '2025-06-12',
+        excerpt: 'Annual database restore simulation test executed on 12 June 2025 with RTO 45m and RPO 10m.',
+        reasons: ['Report is older than 12-month policy cadence', 'Requires refreshed 2026 test execution']
+      },
+      {
+        id: 'ev-5',
+        control_id: 'c3',
+        control_code: 'SEC-003',
+        control_title: 'Cryptographic Controls',
+        doc_name: 'Finance_Infrastructure_Review.pdf',
+        page_number: 8,
+        assessment: 'Requires Human Review', // Blueprint Badge
+        review_status: 'Draft',
+        evidence_date: '2026-04-14',
+        excerpt: 'Backup job cron.fin.nightly calls script export_archive.sh utilizing 3DES-CBC mode.',
+        reasons: ['Legacy encryption detected', 'Requires technical risk determination by security officer']
+      }
+    ];
+
+    // =========================================================================
+    // 6. UPLOADED DOCUMENTS REGISTER
+    // =========================================================================
+    const INITIAL_DOCS = [
+      { id: 'doc-1', filename: '2026_Q2_Access_Audit_Report.pdf', doc_type: 'audit_report', version: '2.1', processing_status: 'Processed', uploaded_at: '2026-06-01', pages_count: 24 },
+      { id: 'doc-2', filename: 'SecOps_Vulnerability_Scan_Report.pdf', doc_type: 'evidence', version: '1.0', processing_status: 'Processed', uploaded_at: '2026-06-15', pages_count: 8 },
+      { id: 'doc-3', filename: 'ABC_Tech_Security_Policy_v4.pdf', doc_type: 'policy', version: '4.0', processing_status: 'Processed', uploaded_at: '2026-01-12', pages_count: 32 },
+      { id: 'doc-4', filename: 'Finance_Infrastructure_Review.pdf', doc_type: 'audit_report', version: '1.0', processing_status: 'Processed', uploaded_at: '2026-05-20', pages_count: 14 }
+    ];
+
+    // =========================================================================
+    // 7. HINDSIGHT PERSISTENT MEMORY BANK ENTRIES (SECTION 6 & 8)
+    // =========================================================================
+    const HINDSIGHT_MEMORIES = [
+      {
+        id: 'mem-001',
+        category: 'Audit finding',
+        audit_period: 'January 2026 (Cycle 1)',
+        control_id: 'SEC-014',
+        department: 'IT Operations',
+        summary: 'Employee access reviews incomplete in IT Operations; approval sign-offs missing.',
+        narrative: 'Audit 1 flagged SEC-014 because 14 privileged database accounts were uncertified. Manager sign-offs were missing from Q4 records.',
+        source_ref: 'AUD-2026-001, page 4',
+        reflection: 'Root cause identified as lack of automated quarterly calendar reminders and absence of designated review coordinator.'
+      },
+      {
+        id: 'mem-002',
+        category: 'Remediation',
+        audit_period: 'February 2026',
+        control_id: 'SEC-014',
+        department: 'IT Operations',
+        summary: 'Control owner submitted review spreadsheet; marked action ready for review.',
+        narrative: 'Owen Owner submitted ad-hoc spreadsheet recertifying database access. Reviewer accepted evidence but required scheduled recurrence.',
+        source_ref: 'REM-2026-014-01',
+        reflection: 'Corrective action addressed symptom (clearing current backlog) rather than establishing institutionalized cadence.'
+      },
+      {
+        id: 'mem-003',
+        category: 'Risk pattern',
+        audit_period: 'April 2026 (Cycle 2)',
+        control_id: 'SEC-014',
+        department: 'IT Operations',
+        summary: 'Recurrence confirmed: similar access-review gap detected in same department.',
+        narrative: 'Audit 2 confirmed access review overdue again. System recalled January memory and highlighted systemic process weakness.',
+        source_ref: 'AUD-2026-002, page 11',
+        reflection: 'High risk early-warning triggered due to recurrence pattern in consecutive audit cycles.'
+      },
+      {
+        id: 'mem-004',
+        category: 'Audit finding',
+        audit_period: 'July 2026 (Cycle 3)',
+        control_id: 'SEC-014',
+        department: 'IT Operations',
+        summary: 'Current cycle: quarterly database access review overdue by 45 days.',
+        narrative: 'New evidence indicates 45 entries reviewed, but missing HR sign-off on 3 terminated contractors. Ongoing recurrence alert.',
+        source_ref: '2026_Q2_Access_Audit_Report.pdf, page 14',
+        reflection: 'Recommended remediation: enforce automated PAM/IAM integration rather than manual spreadsheet verification.'
+      }
+    ];
+
+    // =========================================================================
+    // 8. 3-CYCLE TIMELINE EVENTS (SECTION 5 DEMO SCENARIO)
+    // =========================================================================
+    const TIMELINE_EVENTS = [
+      { event_type: 'audit_cycle', event_date: '2026-01-15', summary: 'Cycle 1 (Jan 2026) Audit Commenced', detail: 'Comprehensive review of Annex A.9 access control framework.' },
+      { event_type: 'finding', event_date: '2026-01-28', summary: 'Defect: SEC-014 Employee Access Reviews Incomplete', detail: 'Audit finding #f-088: 14 privileged database accounts uncertified in IT Operations.' },
+      { event_type: 'remediation', event_date: '2026-02-15', summary: 'Remediation Action Created: Recertify Privileged Accounts', detail: 'Assigned to Owen Owner (IT Operations). Spreadsheets submitted.' },
+      { event_type: 'status_change', event_date: '2026-02-28', summary: 'Control SEC-014 moved from Compliant to Needs Review', detail: 'Status transitioned by Carlos Compliance pending institutionalized calendar process.' },
+      { event_type: 'audit_cycle', event_date: '2026-04-10', summary: 'Cycle 2 (Apr 2026) Audit Commenced', detail: 'Mid-year audit cycle reassessment.' },
+      { event_type: 'finding', event_date: '2026-04-24', summary: 'Recurrence Flagged: SEC-014 SLA Non-compliance Detected Again', detail: 'Hindsight recalled January defect; system confirmed recurrence across cycles.' },
+      { event_type: 'remediation', event_date: '2026-05-10', summary: 'Scheduled Review SOP Introduced', detail: 'New standard operating procedure introduced with named quarterly coordinator.' },
+      { event_type: 'audit_cycle', event_date: '2026-07-01', summary: 'Cycle 3 (Jul 2026) Current Audit Commenced', detail: 'Q3 continuous audit cycle.' },
+      { event_type: 'finding', event_date: '2026-07-15', summary: 'Defect: SEC-014 Privileged Review Overdue by 45 Days', detail: 'Finding #f-101 recorded as Draft AI extraction. Recurrence confirmed with 9.1/10 score.' }
+    ];
+
+    // =========================================================================
+    // 9. MAIN REACT ROOT COMPONENT
+    // =========================================================================
+    function App() {
+      // Current active persona (starts with Carlos Compliance)
+      const [currentUser, setCurrentUser] = useState(SEED_USERS[1]);
+      const [activeTab, setActiveTab] = useState('dashboard');
+
+      // State stores
+      const [controls, setControls] = useState(INITIAL_CONTROLS);
+      const [findings, setFindings] = useState(INITIAL_FINDINGS);
+      const [remediations, setRemediations] = useState(INITIAL_REMEDIATIONS);
+      const [evidenceList, setEvidenceList] = useState(INITIAL_EVIDENCE);
+      const [documents, setDocuments] = useState(INITIAL_DOCS);
+      const [memories, setMemories] = useState(HINDSIGHT_MEMORIES);
+
+      // Persona Scope Filters & Search
+      const [complianceOwnerFilter, setComplianceOwnerFilter] = useState(false);
+      const [remediationOwnerFilter, setRemediationOwnerFilter] = useState(false);
+      const [memorySearchQuery, setMemorySearchQuery] = useState('');
+      const [demoGuideOpen, setDemoGuideOpen] = useState(true);
+
+      // Selected items
+      const [selectedFinding, setSelectedFinding] = useState(INITIAL_FINDINGS[0]);
+      const [selectedControl, setSelectedControl] = useState(INITIAL_CONTROLS.find(c => c.control_code === 'SEC-014'));
+      const [selectedEvidenceControlId, setSelectedEvidenceControlId] = useState('all');
+      const [selectedTimelineCode, setSelectedTimelineCode] = useState('SEC-014');
+
+      // Modals & Drawers
+      const [approveModalOpen, setApproveModalOpen] = useState(false);
+      const [sourceDrawer, setSourceDrawer] = useState({ isOpen: false, doc: '', page: 1, excerpt: '', controlCode: '' });
+
+      // Toast notification
+      const [toast, setToast] = useState(null);
+      const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 4000);
+      };
+
+      // Role helper flags
+      const isAdmin = currentUser.role === 'admin';
+      const isCompliance = currentUser.role === 'compliance_officer';
+      const isOwner = currentUser.role === 'control_owner';
+      const isAuditor = currentUser.role === 'auditor';
+
+      const canApproveFinding = isAdmin || isCompliance;
+      const canCompleteRemediation = isAdmin || isCompliance;
+      const canUpdateRemediationProgress = !isAuditor; // Admin, Compliance, Owner can
+      const canModifyControlStatus = isAdmin || isCompliance;
+      const canReviewEvidence = isAdmin || isCompliance || isAuditor;
+
+      // Switch persona handler with instant filter adaptations
+      const handleUserSwitch = (userId) => {
+        const u = SEED_USERS.find(usr => usr.id === userId);
+        if (u) {
+          setCurrentUser(u);
+          if (u.role === 'control_owner') {
+            setComplianceOwnerFilter(true);
+            setRemediationOwnerFilter(true);
+          } else {
+            setComplianceOwnerFilter(false);
+            setRemediationOwnerFilter(false);
+          }
+          showToast(`Active Persona: ${u.name} (${u.roleLabel})`, 'info');
+        }
+      };
+
+      // Open Source Drawer
+      const openDrawer = (doc, page, excerpt, controlCode) => {
+        setSourceDrawer({ isOpen: true, doc: doc || 'Source Document', page: page || 1, excerpt: excerpt || '', controlCode: controlCode || '' });
+      };
+
+      // Approve Finding Workflow
+      const handleApproveFinding = (findingId) => {
+        if (!canApproveFinding) {
+          showToast('Permission Denied: Only Compliance Officer or Admin can approve findings.', 'error');
+          return;
+        }
+
+        setFindings(prev => prev.map(f => {
+          if (f.id === findingId) {
+            return { ...f, review_status: 'Approved' };
+          }
+          return f;
+        }));
+
+        if (selectedFinding && selectedFinding.id === findingId) {
+          setSelectedFinding(prev => ({ ...prev, review_status: 'Approved' }));
+        }
+
+        // Add a new memory entry to Hindsight Memory Bank!
+        const newMem = {
+          id: `mem-${Date.now()}`,
+          category: 'Audit finding',
+          audit_period: 'July 2026 (Cycle 3)',
+          control_id: selectedFinding.control_code,
+          department: selectedFinding.department,
+          summary: `Approved finding: ${selectedFinding.description.slice(0, 60)}...`,
+          narrative: selectedFinding.description,
+          source_ref: `${selectedFinding.source_doc}, page ${selectedFinding.source_page}`,
+          reflection: 'Approved by ' + currentUser.name + ' (' + currentUser.roleLabel + '). Recurrence pattern retained in memory bank for cross-cycle tracking.'
+        };
+        setMemories(prev => [newMem, ...prev]);
+
+        setApproveModalOpen(false);
+        showToast(`Finding approved! Retained in Hindsight memory bank for ${selectedFinding.control_code}.`, 'success');
+      };
+
+      // Confirm Recurrence
+      const handleConfirmRecurrence = (findingId) => {
+        setFindings(prev => prev.map(f => f.id === findingId ? { ...f, is_recurrence: true } : f));
+        if (selectedFinding && selectedFinding.id === findingId) {
+          setSelectedFinding(prev => ({ ...prev, is_recurrence: true }));
+        }
+        showToast('Recurrence pattern confirmed and flagged on authoritative record.', 'success');
+      };
+
+      // Dismiss Recurrence
+      const handleDismissRecurrence = (findingId) => {
+        setFindings(prev => prev.map(f => f.id === findingId ? { ...f, is_recurrence: false } : f));
+        if (selectedFinding && selectedFinding.id === findingId) {
+          setSelectedFinding(prev => ({ ...prev, is_recurrence: false }));
+        }
+        showToast('Recurrence suggestion dismissed.', 'info');
+      };
+
+      // Remediation Status Transition
+      const handleRemediationStatus = (remId, newStatus) => {
+        if (newStatus === 'Completed' && !canCompleteRemediation) {
+          showToast('Permission Denied: Marking remediations as Completed requires Compliance Officer or Admin sign-off.', 'error');
+          return;
+        }
+        if (isAuditor) {
+          showToast('Auditor Role: Read-only mode. Auditors cannot alter remediation action statuses.', 'error');
+          return;
+        }
+
+        setRemediations(prev => prev.map(r => {
+          if (r.id === remId) {
+            return { ...r, status: newStatus, is_overdue: newStatus === 'Completed' ? false : r.is_overdue };
+          }
+          return r;
+        }));
+        showToast(`Remediation action transitioned to "${newStatus}".`, 'success');
+      };
+
+      // Evidence Review (Accept / Reject)
+      const handleEvidenceReview = (evId, decision) => {
+        if (!canReviewEvidence) {
+          showToast('Permission Denied: Evidence review restricted.', 'error');
+          return;
+        }
+        setEvidenceList(prev => prev.map(ev => {
+          if (ev.id === evId) {
+            return { ...ev, review_status: decision === 'Approved' ? 'Approved' : 'Rejected' };
+          }
+          return ev;
+        }));
+        showToast(`Evidence assessment ${decision === 'Approved' ? 'Accepted & Approved' : 'Rejected'}.`, 'success');
+      };
+
+      // Control Status Transition
+      const handleControlStatus = (ctrlId, newStatus) => {
+        if (!canModifyControlStatus) {
+          showToast('Permission Denied: Only Compliance Officer or Admin can update control statuses.', 'error');
+          return;
+        }
+        setControls(prev => prev.map(c => c.id === ctrlId ? { ...c, status: newStatus } : c));
+        if (selectedControl && selectedControl.id === ctrlId) {
+          setSelectedControl(prev => ({ ...prev, status: newStatus }));
+        }
+        showToast(`Control status updated to "${newStatus}".`, 'success');
+      };
+
+      // Document Process simulation
+      const handleProcessDocument = (docId) => {
+        setDocuments(prev => prev.map(d => d.id === docId ? { ...d, processing_status: 'Processed' } : d));
+        showToast('PyMuPDF text extraction complete. Extracted pages mapped.', 'success');
+      };
+
+      // Document Analyze simulation
+      const handleAnalyzeDocument = (docId) => {
+        const doc = documents.find(d => d.id === docId);
+        showToast(`Compliance mapping analysis complete for ${doc?.filename || 'document'}. Generated 2 candidate mappings and 1 draft finding.`, 'success');
+      };
+
+      // Chat Assistant state
+      const [chatMessages, setChatMessages] = useState([
+        {
+          id: 'msg-1',
+          sender: 'assistant',
+          text: "Hello! I am AuditMind AI, powered by Hindsight persistent memory. I maintain historical context across audit cycles (Cycle 1 Jan, Cycle 2 Apr, Cycle 3 Jul 2026). Ask me about control status, historical recurrences, or overdue remediations.",
+          references: [],
+          memory_recalled: true
+        }
+      ]);
+      const [chatInput, setChatInput] = useState('');
+      const [useHindsightHistory, setUseHindsightHistory] = useState(true);
+      const [hindsightDemoMode, setHindsightDemoMode] = useState('with_memory'); // 'with_memory' vs 'baseline_no_memory'
+
+      const handleChatSubmit = (promptText) => {
+        const q = (promptText || chatInput).trim();
+        if (!q) return;
+
+        const userMsg = { id: Date.now().toString(), sender: 'user', text: q };
+        setChatMessages(prev => [...prev, userMsg]);
+        setChatInput('');
+
+        setTimeout(() => {
+          let reply = '';
+          let refs = [];
+          const qLower = q.toLowerCase();
+
+          if (hindsightDemoMode === 'baseline_no_memory' || !useHindsightHistory) {
+            // Stateless Baseline mode (no Hindsight memory)
+            reply = `[BASELINE AGENT - NO HISTORICAL MEMORY]\n\nBased only on the latest upload, I see that SEC-014 has an open finding. However, because I have NO memory of prior audit cycles, I cannot tell you if this issue occurred before, how it was remediated in January, or if it represents a recurring organizational failure.`;
+          } else {
+            // Hindsight Powered mode
+            if (qLower.includes('sec-014') || qLower.includes('access')) {
+              reply = `**[HINDSIGHT REFLECT — CROSS-CYCLE MEMORY RECALLED]**\n\nYes, **SEC-014 (Employee Access Reviews)** has recurred across all 3 audit cycles at ABC Technologies:\n\n1. **January 2026 (Audit 1):** Flagged because 14 privileged database accounts were uncertified.\n2. **February 2026 (Remediation):** Owen Owner submitted a spreadsheet clearing the backlog, but no recurring schedule was institutionalized.\n3. **April 2026 (Audit 2):** Same failure recurred in IT Operations.\n4. **July 2026 (Audit 3 - Current):** 45 entries reviewed, but HR approvals for 3 terminated contractors are missing.\n\n**Hindsight Recommendation:** This is a systemic workflow flaw. Transition from manual spreadsheet reviews to automated PAM vault recertifications.`;
+              refs = [
+                { label: 'Control SEC-014: Employee Access Reviews', doc: '2026_Q2_Access_Audit_Report.pdf', page: 14, excerpt: 'Quarterly user access rights review for privileged database accounts overdue by 45 days.' },
+                { label: 'Hindsight Memory #mem-001 (Jan 2026)', doc: 'AUD-2026-001, page 4', page: 4, excerpt: 'SEC-014 flagged in January because access reviews were incomplete.' }
+              ];
+            } else if (qLower.includes('overdue')) {
+              reply = `**[HINDSIGHT AUDIT STATUS]**\n\nThere is **1 overdue remediation action** pending in IT Operations:\n\n• **Action:** "Execute privileged database user recertification and submit signed approval matrix"\n• **Assigned Owner:** Owen Owner\n• **Original Due Date:** May 15, 2026 (Currently 60+ days overdue)\n• **Linked Finding:** SEC-014 (Score: 9.1/10 - High Risk)`;
+              refs = [
+                { label: 'Remediation Action #rem-1', doc: '2026_Q2_Access_Audit_Report.pdf', page: 14, excerpt: 'Attach signed spreadsheet and IT Director sign-off letter.' }
+              ];
+            } else if (qLower.includes('risk') || qLower.includes('highest')) {
+              reply = `**[PREDICTIVE COMPLIANCE RISK EVALUATION]**\n\nThe highest risk indicator in the register is **SEC-014 Employee Access Reviews (Risk Score: 9.1 / 10)**.\n\n**Scoring Factor Decomposition:**\n• Base Severity: High (+3.0 pts)\n• Recurrence: Repeated across 3 audit cycles (+3.0 pts)\n• Overdue Remediation: SLA missed by >45 days (+2.0 pts)\n• Evidence Weakness: Missing terminated contractor signoffs (+1.1 pts)\n\n**Total Score: 9.1 / 10 (Critical Watchlist)**`;
+              refs = [
+                { label: 'Finding #f-101 (Score 9.1)', doc: '2026_Q2_Access_Audit_Report.pdf', page: 14, excerpt: 'Quarterly review overdue by 45 days. Prior cycle findings indicate repeated non-compliance.' }
+              ];
+            } else {
+              reply = `**[HINDSIGHT AUDIT MEMORY SEARCH]**\n\nAnalyzed query "${q}" against ABC Technologies memory bank. Searched 20 active ISO 27001 controls, 5 active findings, and 4 Hindsight retained audit memories across 3 audit cycles. All telemetry is up-to-date.`;
+              refs = [
+                { label: 'Control Register: ABC Technologies', doc: 'ABC_Tech_Security_Policy_v4.pdf', page: 1, excerpt: 'Information Security Policy approved by CISO.' }
+              ];
+            }
+          }
+
+          setChatMessages(prev => [...prev, {
+            id: (Date.now() + 1).toString(),
+            sender: 'assistant',
+            text: reply,
+            references: refs,
+            memory_recalled: hindsightDemoMode === 'with_memory' && useHindsightHistory
+          }]);
+        }, 350);
+      };
+
+      // Aggregates
+      const compliantCount = controls.filter(c => c.status === 'Compliant').length;
+      const needsReviewCount = controls.filter(c => c.status === 'Needs Review').length;
+      const gapCount = controls.filter(c => c.status === 'Gap Identified').length;
+      const openFindingsCount = findings.filter(f => f.status !== 'Closed').length;
+      const overdueActionsCount = remediations.filter(r => r.is_overdue).length;
+      const recurringFindingsCount = findings.filter(f => f.is_recurrence).length;
+
+      return (
+        <div className="flex h-screen overflow-hidden bg-slate-50 font-sans">
+          {/* Toast Notification */}
+          {toast && (
+            <div className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-2xl text-xs font-bold text-white transition-all animate-fade-in flex items-center gap-2 ${toast.type === 'success' ? 'bg-emerald-600' : toast.type === 'error' ? 'bg-rose-600' : 'bg-slate-900'}`}>
+              <span>{toast.type === 'success' ? '✓' : toast.type === 'error' ? '⚠️' : 'ℹ️'}</span>
+              <span>{toast.message}</span>
+            </div>
+          )}
+
+          {/* LEFT SIDEBAR NAVIGATION */}
+          <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0 border-r border-slate-800 z-30">
+            {/* Brand Logo */}
+            <div className="h-16 flex items-center px-5 bg-slate-950 border-b border-slate-800 gap-3">
+              <div className="w-9 h-9 rounded-xl bg-teal-500 flex items-center justify-center text-slate-950 font-black text-base shadow-md shadow-teal-500/30">
+                A
+              </div>
+              <div>
+                <span className="font-extrabold text-white text-base tracking-tight">AuditMind AI</span>
+                <span className="block text-[10px] text-teal-400 font-semibold uppercase tracking-wider">Hindsight Intelligence</span>
+              </div>
+            </div>
+
+            {/* Org Header */}
+            <div className="px-5 py-2.5 bg-slate-900/90 border-b border-slate-800 text-xs text-slate-400 flex items-center justify-between">
+              <span className="font-bold text-slate-200">ABC Technologies</span>
+              <span className="text-[10px] font-mono text-teal-400 bg-teal-950/80 px-1.5 py-0.5 rounded border border-teal-800">ISO 27001</span>
+            </div>
+
+            {/* Navigation links (10 Core screens from Blueprint) */}
+            <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1 text-xs">
+              {[
+                { id: 'dashboard', label: '1. Dashboard', icon: '📊' },
+                { id: 'compliance', label: '2. Compliance Monitor', icon: '🛡️', badge: `${compliantCount}/20` },
+                { id: 'findings', label: '3. Findings Review', icon: '🔍', badge: `${openFindingsCount} open` },
+                { id: 'remediations', label: '4. Remediation Tracker', icon: '🔧', badge: `${overdueActionsCount} overdue` },
+                { id: 'evidence', label: '5. Evidence Verifier', icon: '📑', badge: `${evidenceList.length}` },
+                { id: 'documents', label: '6. Document Centre', icon: '📁', badge: `${documents.length}` },
+                { id: 'risks', label: '7. Risk Intelligence', icon: '⚠️', badge: '0-10 Score' },
+                { id: 'history', label: '8. Audit History', icon: '⏱️', badge: '3 Cycles' },
+                { id: 'assistant', label: '9. AI Audit Assistant', icon: '💬', badge: 'Grounded' },
+                { id: 'memory', label: '10. Memory Explorer', icon: '🧠', badge: 'Hindsight', highlight: true }
+              ].map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition font-medium ${activeTab === item.id ? 'bg-teal-600/25 text-teal-300 font-bold border-l-4 border-teal-400 shadow-inner' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${item.highlight ? 'bg-slate-950/60 border border-teal-500/30' : ''}`}
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <span>{item.icon}</span>
+                    <span className="truncate">{item.label}</span>
+                  </div>
+                  {item.badge && (
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${item.highlight ? 'bg-teal-400 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'}`}>
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </nav>
+
+            {/* Hindsight Persistent Memory Footer Pill */}
+            <div className="p-3 m-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-teal-400 font-bold flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
+                  Hindsight Bank Active
+                </span>
+                <span className="text-[10px] font-mono text-slate-500">v1.2</span>
+              </div>
+              <div className="text-slate-400 text-[10px] leading-tight">
+                Bank: <code className="text-teal-300 font-mono">abctech-audit-memory</code>
+              </div>
+              <div className="text-[10px] text-slate-500">
+                Retains facts across audit cycles to explain recurring defects.
+              </div>
+            </div>
+          </aside>
+
+          {/* MAIN CONTENT VIEWPORT */}
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            {/* TOP BAR */}
+            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-20 shrink-0 shadow-xs">
+              <div className="flex items-center gap-3">
+                <span className="text-xs uppercase tracking-wider text-slate-400 font-bold">Workspace:</span>
+                <span className="text-sm font-bold text-slate-900">ABC Technologies — Information Security</span>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  Live Telemetry
+                </span>
+              </div>
+
+              {/* PERSONA SWITCHER — 4 DIRECT INTERACTIVE BUTTONS + SELECT FALLBACK */}
+              <div className="flex items-center gap-3">
+                <div className="hidden lg:flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  {SEED_USERS.map(u => {
+                    const isSelected = currentUser.id === u.id;
+                    const roleColor = u.role === 'admin'
+                      ? 'bg-purple-600 text-white shadow-xs ring-2 ring-purple-300'
+                      : u.role === 'compliance_officer'
+                      ? 'bg-teal-600 text-white shadow-xs ring-2 ring-teal-300'
+                      : u.role === 'control_owner'
+                      ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-300'
+                      : 'bg-amber-600 text-white shadow-xs ring-2 ring-amber-300';
+
+                    return (
+                      <button
+                        key={u.id}
+                        onClick={() => handleUserSwitch(u.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${isSelected ? roleColor : 'text-slate-600 hover:bg-slate-200 hover:text-slate-900'}`}
+                        title={`Click to switch to ${u.name} (${u.roleLabel})`}
+                      >
+                        <span>{u.role === 'admin' ? '👑' : u.role === 'compliance_officer' ? '🛡️' : u.role === 'control_owner' ? '⚙️' : '🔍'}</span>
+                        <span>{u.name.split(' ')[0]}</span>
+                        <span className="text-[10px] opacity-80 uppercase tracking-tight">({u.role === 'compliance_officer' ? 'Officer' : u.role === 'control_owner' ? 'Owner' : u.role === 'admin' ? 'Admin' : 'Auditor'})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="relative">
+                  <select
+                    value={currentUser.id}
+                    onChange={(e) => handleUserSwitch(e.target.value)}
+                    className="rounded-xl border-2 border-teal-600 bg-white py-1.5 px-3 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-teal-500 shadow-sm cursor-pointer hover:bg-teal-50/40 transition"
+                  >
+                    {SEED_USERS.map(u => (
+                      <option key={u.id} value={u.id}>
+                        Persona: {u.name} [{u.roleLabel.toUpperCase()}]
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </header>
+
+            {/* DYNAMIC ROLE PERMISSIONS BANNER (CHANGES VISIBLY ON SWITCHING LOGIN) */}
+            <div className={`px-6 py-2.5 border-b text-xs flex flex-wrap items-center justify-between gap-3 transition-colors ${isAdmin ? 'bg-purple-50 border-purple-200 text-purple-900' : isCompliance ? 'bg-teal-50 border-teal-200 text-teal-900' : isOwner ? 'bg-blue-50 border-blue-200 text-blue-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold uppercase tracking-wide text-[11px] px-2 py-0.5 rounded bg-white/80 border">
+                  {currentUser.roleLabel} Persona Active
+                </span>
+                <span className="font-medium text-xs">
+                  {currentUser.permissionsDesc}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3 text-[11px]">
+                <span>Approve Findings: <strong className={canApproveFinding ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold'}>{canApproveFinding ? 'YES' : 'DISABLED'}</strong></span>
+                <span>•</span>
+                <span>Complete Remediations: <strong className={canCompleteRemediation ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold'}>{canCompleteRemediation ? 'YES' : 'DISABLED'}</strong></span>
+                <span>•</span>
+                <span>Department Scope: <strong className="font-bold">{currentUser.department}</strong></span>
+              </div>
+            </div>
+
+            {/* INTERACTIVE HACKATHON DEMO WALKTHROUGH GUIDE (COLLAPSIBLE) */}
+            {demoGuideOpen && (
+              <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-teal-950 text-white px-6 py-2.5 text-xs flex flex-wrap items-center justify-between gap-3 border-b border-teal-500/30">
+                <div className="flex items-center gap-2">
+                  <span className="bg-teal-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider">
+                    Quick Role Tour
+                  </span>
+                  <span className="text-slate-200 font-medium">
+                    1-Click Hackathon Evaluation Shortcuts:
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => { handleUserSwitch('usr-owner'); setActiveTab('remediations'); }}
+                    className={`px-2.5 py-1 rounded text-white font-bold text-[11px] border transition ${currentUser.role === 'control_owner' ? 'bg-blue-600 border-white ring-2 ring-blue-300' : 'bg-blue-600/70 border-blue-400/40 hover:bg-blue-600'}`}
+                  >
+                    1. Owen Owner (Overdue Action)
+                  </button>
+                  <button
+                    onClick={() => { handleUserSwitch('usr-compliance'); setActiveTab('findings'); }}
+                    className={`px-2.5 py-1 rounded text-white font-bold text-[11px] border transition ${currentUser.role === 'compliance_officer' ? 'bg-teal-600 border-white ring-2 ring-teal-300' : 'bg-teal-600/70 border-teal-400/40 hover:bg-teal-600'}`}
+                  >
+                    2. Carlos Compliance (Approve & Retain)
+                  </button>
+                  <button
+                    onClick={() => { handleUserSwitch('usr-auditor'); setActiveTab('assistant'); }}
+                    className={`px-2.5 py-1 rounded text-white font-bold text-[11px] border transition ${currentUser.role === 'auditor' ? 'bg-amber-600 border-white ring-2 ring-amber-300' : 'bg-amber-600/70 border-amber-400/40 hover:bg-amber-600'}`}
+                  >
+                    3. Audrey Auditor (Grounded Assistant)
+                  </button>
+                  <button
+                    onClick={() => { handleUserSwitch('usr-admin'); setActiveTab('memory'); }}
+                    className={`px-2.5 py-1 rounded text-white font-bold text-[11px] border transition ${currentUser.role === 'admin' ? 'bg-purple-600 border-white ring-2 ring-purple-300' : 'bg-purple-600/70 border-purple-400/40 hover:bg-purple-600'}`}
+                  >
+                    4. Alice Admin (Memory Bank)
+                  </button>
+                  <button onClick={() => setDemoGuideOpen(false)} className="text-slate-400 hover:text-white text-xs ml-2 cursor-pointer" title="Dismiss quick guide">
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* MAIN TAB CONTENT SCROLL AREA */}
+            <main className="flex-1 overflow-y-auto p-6 bg-slate-50/80 space-y-6">
+              {/* TAB 1: CONTINUOUS ASSURANCE DASHBOARD */}
+              {activeTab === 'dashboard' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="pb-2 border-b border-slate-200 flex flex-wrap justify-between items-center gap-4">
+                    <div>
+                      <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Continuous Compliance Dashboard</h1>
+                      <p className="text-xs text-slate-500 mt-0.5">Real-time control status posture, predictive risk indicators, and cross-cycle assurance telemetry</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => setActiveTab('findings')} className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 shadow-2xs">
+                        Review Open Findings ({openFindingsCount})
+                      </button>
+                      <button onClick={() => setActiveTab('assistant')} className="px-3 py-1.5 text-xs font-bold bg-teal-600 text-white rounded-lg hover:bg-teal-700 shadow-xs">
+                        Query Audit Assistant
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* DYNAMIC PERSONA PERSPECTIVE CARD */}
+                  <div className={`p-4 rounded-xl border text-xs flex flex-wrap items-center justify-between gap-3 shadow-xs ${
+                    isOwner
+                      ? 'bg-blue-50/90 border-blue-200 text-blue-950'
+                      : isCompliance
+                      ? 'bg-teal-50/90 border-teal-200 text-teal-950'
+                      : isAdmin
+                      ? 'bg-purple-50/90 border-purple-200 text-purple-950'
+                      : 'bg-amber-50/90 border-amber-200 text-amber-950'
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-white shadow-2xs flex items-center justify-center text-xl shrink-0">
+                        {isOwner ? '⚙️' : isCompliance ? '🛡️' : isAdmin ? '👑' : '🔍'}
+                      </div>
+                      <div>
+                        <div className="font-bold text-sm">
+                          {isOwner ? 'Owen Owner Dashboard Perspective (IT Operations Manager)' : isCompliance ? 'Carlos Compliance Dashboard Perspective (Chief Compliance Officer)' : isAdmin ? 'Alice Admin Superuser Perspective (System Administrator)' : 'Audrey Auditor Oversight Perspective (Lead Internal Auditor)'}
+                        </div>
+                        <div className="text-xs opacity-90 mt-0.5">
+                          {isOwner
+                            ? 'You have 1 overdue remediation action on SEC-014 (45-day SLA breach). Finding approval is disabled per Segregation of Duties.'
+                            : isCompliance
+                            ? '4 Open findings are pending human review. Approving findings triggers Hindsight Retain and flags cross-cycle recurrences.'
+                            : isAdmin
+                            ? 'Full administrative authority across all 20 controls, audit cycles, and user roles.'
+                            : 'Independent audit oversight mode: Remediations & controls are Read-Only. Evidence Verifier and Audit Assistant active.'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      {isOwner && (
+                        <button onClick={() => { setRemediationOwnerFilter(true); setActiveTab('remediations'); }} className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs shadow-xs">
+                          Fix Overdue Remediation Action →
+                        </button>
+                      )}
+                      {isCompliance && (
+                        <button onClick={() => setActiveTab('findings')} className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg text-xs shadow-xs">
+                          Review Open Findings Queue →
+                        </button>
+                      )}
+                      {isAdmin && (
+                        <button onClick={() => setActiveTab('memory')} className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-xs shadow-xs">
+                          Inspect Hindsight Memory Bank →
+                        </button>
+                      )}
+                      {isAuditor && (
+                        <button onClick={() => setActiveTab('evidence')} className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs shadow-xs">
+                          Verify Audit Evidence →
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 4 KPI CARDS */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Controls</div>
+                        <div className="text-3xl font-black text-slate-900 mt-1">{controls.length}</div>
+                        <div className="text-[11px] text-emerald-600 font-bold mt-1">
+                          {compliantCount} Compliant ({Math.round((compliantCount / controls.length) * 100)}%)
+                        </div>
+                      </div>
+                      <div className="w-12 h-12 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-xl font-bold">
+                        🛡️
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Open Findings</div>
+                        <div className="text-3xl font-black text-slate-900 mt-1">{openFindingsCount}</div>
+                        <div className="text-[11px] text-rose-600 font-bold mt-1">
+                          {findings.filter(f => f.severity === 'High').length} High Severity Gaps
+                        </div>
+                      </div>
+                      <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl font-bold">
+                        ⚠️
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Overdue Actions</div>
+                        <div className="text-3xl font-black text-amber-600 mt-1">{overdueActionsCount}</div>
+                        <div className="text-[11px] text-slate-500 font-medium mt-1">
+                          Exceeded SLA target deadline
+                        </div>
+                      </div>
+                      <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold">
+                        ⏱️
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Recurring Findings</div>
+                        <div className="text-3xl font-black text-slate-900 mt-1">{recurringFindingsCount}</div>
+                        <div className="text-[11px] text-teal-600 font-bold mt-1">
+                          Hindsight Recurrence Confirmed
+                        </div>
+                      </div>
+                      <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl font-bold">
+                        🧠
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CHARTS SECTION */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Findings by department per cycle */}
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs lg:col-span-2">
+                      <div className="flex justify-between items-center mb-4">
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900">Findings Per Audit Cycle by Department</h3>
+                          <p className="text-xs text-slate-500">Historical defect frequency across IT Operations, Engineering, Finance, and HR</p>
+                        </div>
+                        <span className="text-[11px] font-semibold text-slate-400">Cycles 1–3</span>
+                      </div>
+
+                      <div className="h-44 flex items-end justify-around gap-4 pt-4 px-4 border-b border-slate-100">
+                        {[
+                          { cycle: 'Cycle 1 (Jan 26)', it: 4, eng: 2, fin: 1, hr: 2 },
+                          { cycle: 'Cycle 2 (Apr 26)', it: 5, eng: 3, fin: 2, hr: 1 },
+                          { cycle: 'Cycle 3 (Jul 26)', it: 3, eng: 2, fin: 1, hr: 1 }
+                        ].map(c => (
+                          <div key={c.cycle} className="flex-1 flex flex-col items-center gap-2">
+                            <div className="w-full flex items-end justify-center gap-1.5 h-32">
+                              <div style={{ height: `${c.it * 20}%` }} className="w-4 bg-teal-600 rounded-t" title={`IT Operations: ${c.it}`}></div>
+                              <div style={{ height: `${c.eng * 20}%` }} className="w-4 bg-blue-500 rounded-t" title={`Engineering: ${c.eng}`}></div>
+                              <div style={{ height: `${c.fin * 20}%` }} className="w-4 bg-amber-500 rounded-t" title={`Finance: ${c.fin}`}></div>
+                              <div style={{ height: `${c.hr * 20}%` }} className="w-4 bg-purple-500 rounded-t" title={`HR: ${c.hr}`}></div>
+                            </div>
+                            <span className="text-[11px] font-bold text-slate-600">{c.cycle}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex justify-center gap-6 mt-3 text-xs">
+                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-teal-600 rounded"></span> IT Operations</span>
+                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-blue-500 rounded"></span> Engineering</span>
+                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-amber-500 rounded"></span> Finance</span>
+                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-purple-500 rounded"></span> HR</span>
+                      </div>
+                    </div>
+
+                    {/* Control Status Register breakdown */}
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900">Control Register Posture</h3>
+                        <p className="text-xs text-slate-500 mb-4">Distribution across 20 ISO 27001 controls</p>
+                      </div>
+
+                      <div className="space-y-3 text-xs">
+                        <div>
+                          <div className="flex justify-between font-bold text-slate-700 mb-1">
+                            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Compliant ({compliantCount})</span>
+                            <span className="text-emerald-700 font-mono">{Math.round((compliantCount / controls.length) * 100)}%</span>
+                          </div>
+                          <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                            <div style={{ width: `${(compliantCount / controls.length) * 100}%` }} className="bg-emerald-500 h-full"></div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between font-bold text-slate-700 mb-1">
+                            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500"></span> Needs Review ({needsReviewCount})</span>
+                            <span className="text-amber-700 font-mono">{Math.round((needsReviewCount / controls.length) * 100)}%</span>
+                          </div>
+                          <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                            <div style={{ width: `${(needsReviewCount / controls.length) * 100}%` }} className="bg-amber-500 h-full"></div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between font-bold text-slate-700 mb-1">
+                            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-500"></span> Gap Identified ({gapCount})</span>
+                            <span className="text-rose-700 font-mono">{Math.round((gapCount / controls.length) * 100)}%</span>
+                          </div>
+                          <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                            <div style={{ width: `${(gapCount / controls.length) * 100}%` }} className="bg-rose-500 h-full"></div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between font-bold text-slate-700 mb-1">
+                            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-slate-400"></span> Not Assessed (2)</span>
+                            <span className="text-slate-600 font-mono">10%</span>
+                          </div>
+                          <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                            <div style={{ width: '10%' }} className="bg-slate-400 h-full"></div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500 flex justify-between">
+                        <span>Framework: ISO/IEC 27001</span>
+                        <span className="text-teal-600 font-bold hover:underline cursor-pointer" onClick={() => setActiveTab('compliance')}>
+                          Inspect Register →
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TOP 5 PRIORITY RISK INDICATORS TABLE */}
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                    <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900">Top Priority Risk Indicators</h3>
+                        <p className="text-xs text-slate-500">Transparent 0-10 score combining severity, recurrence history, and overdue remediation</p>
+                      </div>
+                      <button onClick={() => setActiveTab('risks')} className="text-xs font-bold text-teal-600 hover:text-teal-800 hover:underline">
+                        View All Risk Models →
+                      </button>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase">
+                          <tr>
+                            <th className="py-2.5 px-4">Score</th>
+                            <th className="py-2.5 px-4">Level</th>
+                            <th className="py-2.5 px-4">Control Code</th>
+                            <th className="py-2.5 px-4">Finding Description</th>
+                            <th className="py-2.5 px-4">Department</th>
+                            <th className="py-2.5 px-4">Recurrence Status</th>
+                            <th className="py-2.5 px-4 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {findings.map((f, i) => {
+                            const score = f.severity === 'High' ? (f.is_recurrence ? 9.1 : 7.6) : (f.is_recurrence ? 6.2 : 4.8);
+                            return (
+                              <tr key={f.id} className="hover:bg-slate-50">
+                                <td className="py-3 px-4 font-mono font-bold text-slate-900">
+                                  <span className={`px-2 py-0.5 rounded border ${score >= 7.0 ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>
+                                    {score.toFixed(1)} / 10
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${f.severity === 'High' ? 'bg-rose-50 text-rose-700 border border-rose-300' : 'bg-amber-50 text-amber-700 border border-amber-300'}`}>
+                                    {f.severity}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 font-mono font-bold text-slate-900">{f.control_code}</td>
+                                <td className="py-3 px-4 max-w-md truncate font-semibold text-slate-800">{f.description}</td>
+                                <td className="py-3 px-4 text-slate-600">{f.department}</td>
+                                <td className="py-3 px-4">
+                                  {f.is_recurrence ? (
+                                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
+                                      Repeated Defect
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400">First Occurrence</span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedFinding(f);
+                                      setActiveTab('findings');
+                                    }}
+                                    className="text-xs font-bold text-teal-600 hover:text-teal-800 hover:underline"
+                                  >
+                                    Inspect Finding →
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500 italic">
+                      Disclaimer: Risk scores are advisory early-warning indicators calculated deterministically based on finding severity, recurrence history, remediation status, and control cadence.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: COMPLIANCE MONITOR (FULL 20 CONTROLS REGISTER) */}
+              {activeTab === 'compliance' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="pb-2 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3">
+                    <div>
+                      <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Compliance Monitor & Control Register</h1>
+                      <p className="text-xs text-slate-500">20 ISO/IEC 27001-inspired controls with continuous evidence verification</p>
+                    </div>
+                    {isOwner && (
+                      <span className="text-xs font-bold text-blue-900 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 flex items-center gap-1.5 shadow-2xs">
+                        <span>⚙️</span>
+                        <span>Showing {controls.filter(c => c.owner === 'IT Operations Manager').length} IT Operations controls assigned to Owen Owner</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                    <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-700">Filter Controls:</span>
+                        <button
+                          onClick={() => setComplianceOwnerFilter(false)}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${!complianceOwnerFilter ? 'bg-slate-900 text-white shadow-xs' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                        >
+                          All 20 Controls
+                        </button>
+                        <button
+                          onClick={() => setComplianceOwnerFilter(true)}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${complianceOwnerFilter ? 'bg-blue-600 text-white shadow-xs' : 'bg-blue-50 border border-blue-200 text-blue-800 hover:bg-blue-100'}`}
+                        >
+                          <span>⚙️ IT Operations Only (Owen Owner)</span>
+                          <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${complianceOwnerFilter ? 'bg-blue-800 text-white' : 'bg-blue-200 text-blue-900 font-bold'}`}>
+                            {controls.filter(c => c.owner === 'IT Operations Manager').length}
+                          </span>
+                        </button>
+                      </div>
+
+                      <span className="text-slate-500 text-[11px]">
+                        {complianceOwnerFilter ? `Filtered: Showing ${controls.filter(c => c.owner === 'IT Operations Manager').length} controls assigned to IT Operations` : 'Authoritative ISO 27001 continuous compliance baseline'}
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50/75 text-[11px] font-semibold text-slate-500 uppercase border-b border-slate-200">
+                          <tr>
+                            <th className="py-3 px-4">Control Code</th>
+                            <th className="py-3 px-4">Title & Description</th>
+                            <th className="py-3 px-4">Owner</th>
+                            <th className="py-3 px-4">Cadence</th>
+                            <th className="py-3 px-4">Status</th>
+                            <th className="py-3 px-4 text-right">Human Status Sign-off</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {controls
+                            .filter(c => !complianceOwnerFilter || c.owner === 'IT Operations Manager')
+                            .map(c => {
+                            const isMyControl = c.owner === 'IT Operations Manager';
+                            return (
+                              <tr key={c.id} className={`hover:bg-slate-50/80 transition ${isMyControl && isOwner ? 'bg-blue-50/40' : ''}`}>
+                                <td className="py-3 px-4 font-mono font-bold text-slate-900">
+                                  <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                    {c.control_code}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="font-bold text-slate-900 flex items-center gap-2">
+                                    <span>{c.title}</span>
+                                    {isMyControl && (
+                                      <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.2 rounded-full border border-blue-200">
+                                        Assigned to Owen
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[11px] text-slate-500 max-w-md truncate">{c.evidence_expectation}</div>
+                                </td>
+                                <td className="py-3 px-4 font-medium text-slate-700">{c.owner}</td>
+                                <td className="py-3 px-4 capitalize text-slate-500">{c.cadence}</td>
+                                <td className="py-3 px-4">
+                                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${c.status === 'Compliant' ? 'bg-emerald-50 text-emerald-800 border border-emerald-300' : c.status === 'Needs Review' ? 'bg-amber-50 text-amber-800 border border-amber-300' : c.status === 'Gap Identified' ? 'bg-rose-50 text-rose-800 border border-rose-300' : 'bg-slate-100 text-slate-700 border border-slate-300'}`}>
+                                    {c.status}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-right space-x-1 whitespace-nowrap">
+                                  {canModifyControlStatus ? (
+                                    <>
+                                      <button
+                                        onClick={() => handleControlStatus(c.id, 'Compliant')}
+                                        disabled={c.status === 'Compliant'}
+                                        className="text-[10px] font-bold px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 disabled:opacity-40 cursor-pointer"
+                                      >
+                                        Set Compliant
+                                      </button>
+                                      <button
+                                        onClick={() => handleControlStatus(c.id, 'Needs Review')}
+                                        disabled={c.status === 'Needs Review'}
+                                        className="text-[10px] font-bold px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 disabled:opacity-40 cursor-pointer"
+                                      >
+                                        Set Needs Review
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <span className="text-[11px] text-slate-400 italic">
+                                      {isOwner ? 'Owner View Only (Self-certification disabled)' : 'Auditor Oversight (Read-Only)'}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: FINDINGS REVIEW & APPROVAL WORKFLOW */}
+              {activeTab === 'findings' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="pb-2 border-b border-slate-200 flex justify-between items-center">
+                    <div>
+                      <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Findings Review & Verification</h1>
+                      <p className="text-xs text-slate-500">Human-in-the-loop review queue for AI-extracted audit deficiencies with Hindsight recurrence recall</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    {/* Findings list (Left Column) */}
+                    <div className="lg:col-span-5 bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                      <div className="p-3.5 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-700 flex justify-between">
+                        <span>Active Findings Repository</span>
+                        <span className="text-[11px] text-slate-400">{findings.length} findings</span>
+                      </div>
+
+                      <div className="divide-y divide-slate-100 max-h-[650px] overflow-y-auto">
+                        {findings.map(f => (
+                          <div
+                            key={f.id}
+                            onClick={() => setSelectedFinding(f)}
+                            className={`p-4 cursor-pointer transition text-left ${selectedFinding.id === f.id ? 'bg-teal-50/80 border-l-4 border-teal-600' : 'hover:bg-slate-50'}`}
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="font-mono font-bold text-xs bg-slate-100 px-2 py-0.5 rounded border">{f.control_code}</span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${f.severity === 'High' ? 'bg-rose-50 text-rose-700 border border-rose-300' : 'bg-amber-50 text-amber-700 border border-amber-300'}`}>
+                                {f.severity}
+                              </span>
+                            </div>
+
+                            <p className="text-xs font-bold text-slate-900 leading-snug line-clamp-2">{f.description}</p>
+
+                            <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500">
+                              <span>Dept: <strong>{f.department}</strong></span>
+                              {f.review_status === 'Approved' ? (
+                                <span className="text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 rounded border-2 border-emerald-600 text-[10px]">
+                                  ✓ Approved Record
+                                </span>
+                              ) : (
+                                <span className="text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded border-2 border-dashed border-amber-400 text-[10px]">
+                                  AI Suggestion (Draft)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Selected Finding Detail & Approval (Right Column) */}
+                    <div className="lg:col-span-7 bg-white rounded-xl border border-slate-200 shadow-xs p-6 space-y-5">
+                      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-slate-800">{selectedFinding.control_code}</span>
+                          {selectedFinding.review_status === 'Approved' ? (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border-2 border-emerald-600 flex items-center gap-1">
+                              ✓ Approved Authoritative Record
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-900 border-2 border-dashed border-amber-400">
+                              ⚡ AI Suggestion — Needs Human Review
+                            </span>
+                          )}
+                        </div>
+
+                        {/* APPROVE BUTTON (ROLE-GOVERNED) */}
+                        {selectedFinding.review_status === 'Draft' && (
+                          canApproveFinding ? (
+                            <button
+                              onClick={() => setApproveModalOpen(true)}
+                              className="px-4 py-2 rounded-lg text-xs font-bold text-white transition flex items-center gap-1.5 shadow-xs bg-emerald-600 hover:bg-emerald-700 cursor-pointer"
+                              title="Approve finding and trigger Hindsight memory retain"
+                            >
+                              <span>✓</span>
+                              <span>Approve Finding</span>
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-300">
+                                🔒 Approval Restricted ({currentUser.roleLabel})
+                              </span>
+                              <button
+                                onClick={() => { handleUserSwitch('usr-compliance'); showToast('Switched to Carlos Compliance. You can now approve this finding.', 'success'); }}
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white shadow-xs cursor-pointer"
+                              >
+                                Switch to Carlos to Approve →
+                              </button>
+                            </div>
+                          )
+                        )}
+                      </div>
+
+                      {/* Role restriction banner inside detail card */}
+                      {!canApproveFinding && selectedFinding.review_status === 'Draft' && (
+                        <div className="p-3 bg-amber-50 border border-amber-300 text-amber-950 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">🔒</span>
+                            <span><strong>Segregation of Duties Enforced:</strong> You are logged in as <strong>{currentUser.name}</strong> ({currentUser.roleLabel}). Only a Compliance Officer (Carlos) or Admin (Alice) can approve draft findings into authoritative records.</span>
+                          </div>
+                          <button
+                            onClick={() => { handleUserSwitch('usr-compliance'); showToast('Switched to Carlos Compliance. Ready to approve finding.', 'success'); }}
+                            className="px-2.5 py-1 bg-teal-700 hover:bg-teal-800 text-white font-bold rounded-lg text-xs"
+                          >
+                            Switch to Carlos Now →
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Finding Description & Attributes */}
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900 mb-2">{selectedFinding.description}</h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
+                          <div><span className="text-[10px] text-slate-400 uppercase font-bold block">Control</span> <span className="font-mono font-bold text-slate-900">{selectedFinding.control_code}</span></div>
+                          <div><span className="text-[10px] text-slate-400 uppercase font-bold block">Department</span> <span className="font-bold text-slate-900">{selectedFinding.department}</span></div>
+                          <div><span className="text-[10px] text-slate-400 uppercase font-bold block">Severity</span> <span className="font-bold text-rose-600">{selectedFinding.severity}</span></div>
+                          <div><span className="text-[10px] text-slate-400 uppercase font-bold block">Status</span> <span className="font-bold text-slate-900">{selectedFinding.status}</span></div>
+                        </div>
+                      </div>
+
+                      {/* Cited Source Document Excerpt */}
+                      <div className="bg-teal-50/60 border border-teal-200 p-4 rounded-xl space-y-2">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-teal-900 uppercase tracking-wide text-[11px] flex items-center gap-1">
+                            📄 Verifiable Source Document Excerpt
+                          </span>
+                          <button
+                            onClick={() => openDrawer(selectedFinding.source_doc, selectedFinding.source_page, selectedFinding.source_excerpt, selectedFinding.control_code)}
+                            className="text-xs font-bold text-teal-700 hover:text-teal-900 hover:underline bg-white px-2.5 py-1 rounded border border-teal-300 shadow-2xs"
+                          >
+                            Open Source Drawer →
+                          </button>
+                        </div>
+                        <blockquote className="text-xs text-slate-800 italic border-l-4 border-teal-600 pl-3 py-1.5 bg-white rounded shadow-2xs">
+                          "{selectedFinding.source_excerpt}"
+                        </blockquote>
+                        <div className="text-[11px] text-slate-500 font-mono">
+                          Document: {selectedFinding.source_doc} • Page {selectedFinding.source_page}
+                        </div>
+                      </div>
+
+                      {/* Recurrence Pattern / Hindsight Memory Recall */}
+                      {selectedFinding.is_recurrence && selectedFinding.recurrence_match && (
+                        <div className="border-2 border-amber-300 bg-amber-50/60 p-4 rounded-xl space-y-2.5">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-extrabold text-amber-950 uppercase tracking-wide flex items-center gap-1.5">
+                              🧠 Hindsight Recurrence Recall (Cross-Cycle Pattern)
+                            </span>
+                            <span className="text-[10px] font-mono font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded">
+                              Match Score: {selectedFinding.recurrence_match.score} / 10
+                            </span>
+                          </div>
+                          <p className="text-xs text-amber-900 font-medium">
+                            {selectedFinding.recurrence_match.reason}
+                          </p>
+                          <div className="text-[11px] text-amber-800 bg-white/70 p-2 rounded border border-amber-200">
+                            <strong>Matched Memory:</strong> {selectedFinding.recurrence_match.matchedFinding}
+                          </div>
+
+                          <div className="flex gap-2 pt-1">
+                            <button
+                              onClick={() => handleConfirmRecurrence(selectedFinding.id)}
+                              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold shadow-xs"
+                            >
+                              Confirm Recurrence on Record
+                            </button>
+                            <button
+                              onClick={() => handleDismissRecurrence(selectedFinding.id)}
+                              className="px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold shadow-2xs"
+                            >
+                              Dismiss Recurrence
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: REMEDIATION ACTION TRACKER */}
+              {activeTab === 'remediations' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="pb-2 border-b border-slate-200 flex justify-between items-center">
+                    <div>
+                      <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Remediation Action Tracker</h1>
+                      <p className="text-xs text-slate-500">Role-governed corrective workflow: Control Owner advances progress • Compliance Officer signs off completion</p>
+                    </div>
+                  </div>
+
+                  {/* Overdue alert banner if any */}
+                  {overdueActionsCount > 0 && (
+                    <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-xl text-rose-900 text-xs flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base font-bold">⚠️</span>
+                        <span><strong>{overdueActionsCount} Overdue Remediation:</strong> Database privileged access review past due date. Requires immediate attention by {currentUser.name}.</span>
+                      </div>
+                      <span className="font-mono text-rose-700 font-bold bg-rose-100 px-2 py-0.5 rounded">SLA Breached</span>
+                    </div>
+                  )}
+
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                    <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-700">Filter View:</span>
+                        <button
+                          onClick={() => setRemediationOwnerFilter(false)}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${!remediationOwnerFilter ? 'bg-slate-900 text-white shadow-xs' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                        >
+                          All Remediations ({remediations.length})
+                        </button>
+                        <button
+                          onClick={() => setRemediationOwnerFilter(true)}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${remediationOwnerFilter ? 'bg-blue-600 text-white shadow-xs' : 'bg-blue-50 border border-blue-200 text-blue-800 hover:bg-blue-100'}`}
+                        >
+                          <span>⚙️ Assigned to Owen Owner</span>
+                          <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${remediationOwnerFilter ? 'bg-blue-800 text-white' : 'bg-blue-200 text-blue-900 font-bold'}`}>
+                            {remediations.filter(r => r.owner === 'Owen Owner').length}
+                          </span>
+                        </button>
+                      </div>
+
+                      <span className="text-slate-500 text-[11px]">
+                        {remediationOwnerFilter ? `Filtered: Showing ${remediations.filter(r => r.owner === 'Owen Owner').length} actions owned by Owen Owner` : 'Full organization corrective action queue'}
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase border-b border-slate-200">
+                          <tr>
+                            <th className="py-3 px-4">Status</th>
+                            <th className="py-3 px-4">Action Item</th>
+                            <th className="py-3 px-4">Control</th>
+                            <th className="py-3 px-4">Owner</th>
+                            <th className="py-3 px-4">Target Due Date</th>
+                            <th className="py-3 px-4 text-right">Workflow Status Transitions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {remediations
+                            .filter(rem => !remediationOwnerFilter || rem.owner === 'Owen Owner')
+                            .map(rem => {
+                            const isMyRemediation = rem.owner === 'Owen Owner';
+                            return (
+                              <tr key={rem.id} className={`hover:bg-slate-50 ${rem.is_overdue ? 'bg-rose-50/30' : isMyRemediation && isOwner ? 'bg-blue-50/20' : ''}`}>
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${rem.status === 'Completed' ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : rem.status === 'Ready for Review' ? 'bg-purple-50 text-purple-800 border-purple-300' : rem.status === 'In Progress' ? 'bg-blue-50 text-blue-800 border-blue-300' : 'bg-slate-100 text-slate-700 border-slate-300'}`}>
+                                    {rem.status}
+                                  </span>
+                                </td>
+
+                                <td className="py-3.5 px-4">
+                                  <div className="font-bold text-slate-900 flex items-center gap-2">
+                                    <span>{rem.action}</span>
+                                    {isMyRemediation && (
+                                      <span className="text-[10px] font-bold text-blue-800 bg-blue-100 px-2 py-0.2 rounded-full border border-blue-200">
+                                        Assigned to Owen
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[11px] text-slate-500 italic mt-0.5">Note: {rem.evidence_note}</div>
+                                </td>
+
+                                <td className="py-3.5 px-4 font-mono font-bold text-slate-800">{rem.control_code}</td>
+                                <td className="py-3.5 px-4 font-semibold text-slate-700">{rem.owner}</td>
+
+                                <td className="py-3.5 px-4 whitespace-nowrap font-mono">
+                                  <span className={rem.is_overdue ? 'text-rose-600 font-extrabold flex items-center gap-1' : 'text-slate-600 font-semibold'}>
+                                    <span>{rem.due_date}</span>
+                                    {rem.is_overdue && (
+                                      <span className="bg-rose-100 text-rose-800 text-[10px] px-1.5 py-0.2 rounded font-bold border border-rose-300">
+                                        ⚠️ 45d Overdue
+                                      </span>
+                                    )}
+                                  </span>
+                                </td>
+
+                                {/* ROLE-BASED STATUS TRANSITION BUTTONS */}
+                                <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                                  {isAuditor ? (
+                                    <span className="text-slate-400 italic text-[11px]">Auditor (Read-Only)</span>
+                                  ) : rem.status === 'Completed' ? (
+                                    <span className="text-emerald-700 font-bold text-[11px] flex items-center justify-end gap-1">
+                                      <span>✓</span>
+                                      <span>Verified & Closed</span>
+                                    </span>
+                                  ) : (
+                                    <>
+                                      {/* Control Owner can transition to In Progress or Ready for Review */}
+                                      {canUpdateRemediationProgress && (
+                                        <>
+                                          <button
+                                            onClick={() => handleRemediationStatus(rem.id, 'In Progress')}
+                                            disabled={rem.status === 'In Progress'}
+                                            className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-300 disabled:opacity-40 cursor-pointer"
+                                          >
+                                            In Progress
+                                          </button>
+                                          <button
+                                            onClick={() => handleRemediationStatus(rem.id, 'Ready for Review')}
+                                            disabled={rem.status === 'Ready for Review'}
+                                            className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300 disabled:opacity-40 cursor-pointer"
+                                          >
+                                            Ready for Review
+                                          </button>
+                                        </>
+                                      )}
+
+                                      {/* Only Compliance Officer or Admin can sign off to Completed */}
+                                      {canCompleteRemediation ? (
+                                        <button
+                                          onClick={() => handleRemediationStatus(rem.id, 'Completed')}
+                                          className="px-3 py-1 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer"
+                                        >
+                                          Sign Off Completed
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => { handleUserSwitch('usr-compliance'); showToast('Switched to Carlos Compliance. You can now sign off completion.', 'success'); }}
+                                          className="px-2.5 py-1 text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-300 rounded-lg hover:bg-teal-100 cursor-pointer"
+                                          title="Sign-off requires Compliance Officer approval"
+                                        >
+                                          Switch to Carlos to Sign Off →
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 5: AUTOMATED AUDIT EVIDENCE VERIFIER */}
+              {activeTab === 'evidence' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="pb-2 border-b border-slate-200 flex justify-between items-center">
+                    <div>
+                      <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Audit Evidence Verifier</h1>
+                      <p className="text-xs text-slate-500">Automated mapping and labelled assessments: Candidate Match, Missing, Expired, Incomplete, Requires Human Review</p>
+                    </div>
+                  </div>
+
+                  {/* Filter by control */}
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3 text-xs">
+                    <span className="font-bold text-slate-700">Filter by Control:</span>
+                    <select
+                      value={selectedEvidenceControlId}
+                      onChange={(e) => setSelectedEvidenceControlId(e.target.value)}
+                      className="rounded-lg border border-slate-300 py-1.5 px-3 text-xs bg-white focus:ring-1 focus:ring-teal-500"
+                    >
+                      <option value="all">All Controls ({evidenceList.length} evidence items)</option>
+                      {controls.map(c => (
+                        <option key={c.id} value={c.control_code}>{c.control_code}: {c.title}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Evidence Cards */}
+                  <div className="space-y-4">
+                    {evidenceList
+                      .filter(ev => selectedEvidenceControlId === 'all' || ev.control_code === selectedEvidenceControlId)
+                      .map(ev => {
+                        return (
+                          <div key={ev.id} className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-3">
+                            <div className="flex flex-wrap justify-between items-center gap-2 pb-2 border-b border-slate-100">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-xs bg-slate-900 text-white px-2 py-0.5 rounded">
+                                  {ev.control_code}
+                                </span>
+                                <span className="font-bold text-slate-900 text-xs">{ev.control_title}</span>
+                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${ev.assessment === 'Candidate Match' ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : ev.assessment === 'Missing' ? 'bg-rose-50 text-rose-800 border-rose-300' : ev.assessment === 'Expired' ? 'bg-orange-50 text-orange-800 border-orange-300' : ev.assessment === 'Incomplete' ? 'bg-amber-50 text-amber-800 border-amber-300' : 'bg-slate-100 text-slate-700 border-slate-300'}`}>
+                                  {ev.assessment}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {ev.review_status === 'Approved' ? (
+                                  <span className="text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-400 text-xs">
+                                    ✓ Approved Evidence
+                                  </span>
+                                ) : (
+                                  <span className="text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded border border-dashed border-amber-400 text-xs">
+                                    Draft Assessment
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1">
+                                <div className="text-[10px] uppercase font-bold text-slate-400">Source Document</div>
+                                <div className="font-bold text-slate-800">{ev.doc_name}</div>
+                                <div className="text-slate-500 text-[11px]">Page {ev.page_number} • Date: {ev.evidence_date}</div>
+                              </div>
+
+                              <div className="md:col-span-2 space-y-1">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[10px] uppercase font-bold text-slate-400">Extracted Excerpt</span>
+                                  <button
+                                    onClick={() => openDrawer(ev.doc_name, ev.page_number, ev.excerpt, ev.control_code)}
+                                    className="text-xs font-bold text-teal-700 hover:underline"
+                                  >
+                                    View Source Page →
+                                  </button>
+                                </div>
+                                <blockquote className="text-xs text-slate-800 italic border-l-3 border-teal-600 pl-3 py-1 bg-slate-50 rounded">
+                                  "{ev.excerpt}"
+                                </blockquote>
+                              </div>
+                            </div>
+
+                            {/* Review Buttons */}
+                            <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs">
+                              <div className="text-[11px] text-slate-500">
+                                Assessment Reasons: {ev.reasons.join('; ')}
+                              </div>
+
+                              <div className="space-x-2">
+                                {canReviewEvidence ? (
+                                  <>
+                                    <button
+                                      onClick={() => handleEvidenceReview(ev.id, 'Approved')}
+                                      disabled={ev.review_status === 'Approved'}
+                                      className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40"
+                                    >
+                                      Accept Assessment
+                                    </button>
+                                    <button
+                                      onClick={() => handleEvidenceReview(ev.id, 'Rejected')}
+                                      className="px-3 py-1 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 border border-rose-300 hover:bg-rose-100"
+                                    >
+                                      Reject
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="text-slate-400 italic">Review requires Compliance Officer / Auditor privileges</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 6: DOCUMENT CENTRE */}
+              {activeTab === 'documents' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="pb-2 border-b border-slate-200">
+                    <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Document Centre</h1>
+                    <p className="text-xs text-slate-500">Upload audit reports, policies, and evidence for text extraction and compliance mapping</p>
+                  </div>
+
+                  {/* Upload box */}
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-6 space-y-4">
+                    <h3 className="text-sm font-bold text-slate-900">Upload Audit Artifact (PDF / TXT)</h3>
+                    <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-teal-500 bg-slate-50/50 cursor-pointer transition">
+                      <div className="text-3xl mb-2">📄</div>
+                      <div className="text-xs font-bold text-slate-800">Drag & drop compliance report or click to browse</div>
+                      <div className="text-[11px] text-slate-400 mt-1">Supported formats: PDF, TXT (Maximum: 20 MB)</div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Document Classification</label>
+                        <select className="w-full rounded-lg border border-slate-300 p-2 text-xs bg-white">
+                          <option value="audit_report">Audit Report (Extracts candidate findings)</option>
+                          <option value="evidence">Evidence (Maps to control register)</option>
+                          <option value="policy">Policy (Baseline rules & scopes)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Version</label>
+                        <input type="text" defaultValue="2026-Q3" className="w-full rounded-lg border border-slate-300 p-2 text-xs bg-white" />
+                      </div>
+                      <div className="flex items-end">
+                        <button
+                          onClick={() => {
+                            const newDoc = {
+                              id: `doc-${Date.now()}`,
+                              filename: 'Q3_Security_Compliance_Audit.pdf',
+                              doc_type: 'audit_report',
+                              version: '1.0',
+                              processing_status: 'Uploaded',
+                              uploaded_at: '2026-07-20',
+                              pages_count: 18
+                            };
+                            setDocuments(prev => [newDoc, ...prev]);
+                            showToast('New audit report uploaded! Ready for PyMuPDF processing.', 'success');
+                          }}
+                          className="w-full py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold text-xs shadow-xs"
+                        >
+                          Simulate Upload
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Documents table */}
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                    <div className="p-4 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-700">
+                      Uploaded Documents Register ({documents.length})
+                    </div>
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase border-b border-slate-200">
+                        <tr>
+                          <th className="py-3 px-4">Filename</th>
+                          <th className="py-3 px-4">Type</th>
+                          <th className="py-3 px-4">Version</th>
+                          <th className="py-3 px-4">Processing Status</th>
+                          <th className="py-3 px-4">Uploaded</th>
+                          <th className="py-3 px-4 text-right">Pipeline Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {documents.map(d => (
+                          <tr key={d.id} className="hover:bg-slate-50">
+                            <td className="py-3 px-4 font-bold text-slate-900">{d.filename}</td>
+                            <td className="py-3 px-4 uppercase text-[10px] font-bold text-slate-600">{d.doc_type}</td>
+                            <td className="py-3 px-4 font-mono">{d.version}</td>
+                            <td className="py-3 px-4">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${d.processing_status === 'Processed' ? 'bg-emerald-50 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-700'}`}>
+                                {d.processing_status}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 font-mono text-slate-500">{d.uploaded_at}</td>
+                            <td className="py-3 px-4 text-right space-x-2">
+                              {d.processing_status === 'Uploaded' && (
+                                <button
+                                  onClick={() => handleProcessDocument(d.id)}
+                                  className="px-2.5 py-1 rounded bg-teal-50 text-teal-800 font-bold border border-teal-300 text-xs"
+                                >
+                                  Process Text
+                                </button>
+                              )}
+                              {d.processing_status === 'Processed' && (
+                                <button
+                                  onClick={() => handleAnalyzeDocument(d.id)}
+                                  className="px-2.5 py-1 rounded bg-teal-600 text-white font-bold text-xs hover:bg-teal-700"
+                                >
+                                  Analyze Compliance
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 7: PREDICTIVE RISK INTELLIGENCE & EARLY-WARNING */}
+              {activeTab === 'risks' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="pb-2 border-b border-slate-200">
+                    <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Predictive Compliance Risk & Early-Warning</h1>
+                    <p className="text-xs text-slate-500">Transparent 0-10 scoring model combining severity, recurrence history, overdue remediation, and evidence weakness</p>
+                  </div>
+
+                  {/* Prominent Disclaimer Notice per Blueprint Section 12 */}
+                  <div className="p-4 bg-teal-50 border border-teal-300 rounded-xl text-teal-950 text-xs space-y-1">
+                    <div className="font-extrabold uppercase tracking-wide text-[11px] text-teal-900">
+                      ⚖️ Hackathon Transparent Scoring Methodology
+                    </div>
+                    <p className="leading-relaxed">
+                      Risk scores are advisory early-warning indicators calculated deterministically based on: <strong>Severity</strong> (High: 3, Med: 2, Low: 1) + <strong>Recurrence across cycles</strong> (0–3 pts) + <strong>Overdue remediation</strong> (0–2 pts) + <strong>Evidence weakness</strong> (0–2 pts). Capped at 10.0. They assist human prioritisation and do not represent formal audit certifications.
+                    </p>
+                  </div>
+
+                  {/* Ranked Risks Table with Component Decomposition */}
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                    <div className="p-4 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-700">
+                      Ranked Audit Deficiencies by Risk Priority
+                    </div>
+
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase border-b border-slate-200">
+                        <tr>
+                          <th className="py-3 px-4">Score / 10</th>
+                          <th className="py-3 px-4">Control</th>
+                          <th className="py-3 px-4">Defect Narrative</th>
+                          <th className="py-3 px-4">Department</th>
+                          <th className="py-3 px-4">Transparent Component Scoring Breakdown</th>
+                          <th className="py-3 px-4 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {findings.map(f => {
+                          const base = f.severity === 'High' ? 3.0 : 2.0;
+                          const recur = f.is_recurrence ? 3.0 : 0.0;
+                          const overdue = f.id === 'f-101' ? 2.0 : 0.0;
+                          const evWeak = f.id === 'f-101' ? 1.1 : 0.5;
+                          const total = (base + recur + overdue + evWeak).toFixed(1);
+
+                          return (
+                            <tr key={f.id} className="hover:bg-slate-50">
+                              <td className="py-3.5 px-4 font-mono font-black text-slate-900">
+                                <span className={`px-2.5 py-1 rounded border text-xs ${parseFloat(total) >= 7.0 ? 'bg-rose-50 text-rose-800 border-rose-300' : 'bg-amber-50 text-amber-800 border-amber-300'}`}>
+                                  {total} / 10
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 font-mono font-bold text-slate-900">{f.control_code}</td>
+                              <td className="py-3.5 px-4 font-bold text-slate-900 max-w-sm">{f.description}</td>
+                              <td className="py-3.5 px-4 text-slate-600">{f.department}</td>
+                              <td className="py-3.5 px-4 text-[11px] text-slate-600">
+                                <div className="space-y-0.5 font-mono">
+                                  <span>Severity: +{base.toFixed(1)}</span> •{' '}
+                                  <span>Recurrence: +{recur.toFixed(1)}</span> •{' '}
+                                  <span>Overdue: +{overdue.toFixed(1)}</span> •{' '}
+                                  <span>Evidence Gap: +{evWeak.toFixed(1)}</span>
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-4 text-right">
+                                <button
+                                  onClick={() => { setSelectedFinding(f); setActiveTab('findings'); }}
+                                  className="text-xs font-bold text-teal-600 hover:underline"
+                                >
+                                  Inspect Finding →
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 8: AUDIT HISTORY TIMELINE */}
+              {activeTab === 'history' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="pb-2 border-b border-slate-200 flex justify-between items-center">
+                    <div>
+                      <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Audit History Timeline</h1>
+                      <p className="text-xs text-slate-500">Chronological organizational memory across audit cycles (Jan 2026, Apr 2026, Jul 2026)</p>
+                    </div>
+                  </div>
+
+                  {/* Selector */}
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3 text-xs">
+                    <span className="font-bold text-slate-700">Select Control Timeline:</span>
+                    <select
+                      value={selectedTimelineCode}
+                      onChange={(e) => setSelectedTimelineCode(e.target.value)}
+                      className="rounded-lg border border-slate-300 py-1.5 px-3 text-xs bg-white font-bold"
+                    >
+                      <option value="SEC-014">SEC-014: Employee Access Reviews (3-Cycle Recurrence Chain)</option>
+                      <option value="SEC-013">SEC-013: Vulnerability Management</option>
+                      <option value="SEC-003">SEC-003: Cryptographic Controls</option>
+                    </select>
+                  </div>
+
+                  {/* Vertical Timeline */}
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-8">
+                    <div className="relative pl-8 border-l-2 border-slate-200 ml-4 space-y-8">
+                      {TIMELINE_EVENTS.map((ev, i) => {
+                        const isCycle = ev.event_type === 'audit_cycle';
+                        const isRecur = ev.summary.includes('Recurrence') || ev.summary.includes('Recurring');
+                        const isRem = ev.event_type === 'remediation';
+
+                        return (
+                          <div key={i} className="relative">
+                            <div className={`absolute -left-[45px] top-1.5 w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-bold shadow-md ${isCycle ? 'bg-blue-600 ring-4 ring-blue-100' : isRecur ? 'bg-amber-500 ring-4 ring-amber-100' : isRem ? 'bg-purple-600 ring-4 ring-purple-100' : 'bg-rose-600 ring-4 ring-rose-100'}`}>
+                              {isCycle ? '📅' : isRecur ? '⚠️' : isRem ? '🔧' : '•'}
+                            </div>
+
+                            <div className={`p-4 rounded-xl border space-y-1.5 ${isRecur ? 'bg-amber-50/50 border-amber-300' : isCycle ? 'bg-blue-50/30 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="font-bold text-slate-900 text-sm">{ev.summary}</span>
+                                <span className="font-mono text-slate-500 font-semibold">{ev.event_date}</span>
+                              </div>
+                              <p className="text-xs text-slate-700 leading-relaxed">{ev.detail}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 9: AI AUDIT ASSISTANT (WITH HINDSIGHT VS BASELINE COMPARISON) */}
+              {activeTab === 'assistant' && (
+                <div className="flex flex-col h-[calc(100vh-13rem)] space-y-4 animate-fade-in">
+                  <div className="pb-2 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3">
+                    <div>
+                      <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+                        <span>💬</span> AI Audit Assistant
+                      </h1>
+                      <p className="text-xs text-slate-500">Grounded compliance intelligence recalling cross-cycle memory with verifiable source citations</p>
+                    </div>
+
+                    {/* HINDSIGHT DEMO SWITCH: BASELINE VS HINDSIGHT (SECTION 5 DEMO PAYOFF) */}
+                    <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl border border-slate-200 text-xs">
+                      <span className="font-bold text-slate-500 text-[11px] ml-1">Demo Mode:</span>
+                      <button
+                        onClick={() => {
+                          setHindsightDemoMode('with_memory');
+                          showToast('Switched to Hindsight-Powered Agent with memory.', 'info');
+                        }}
+                        className={`px-3 py-1 rounded-lg font-bold text-xs transition ${hindsightDemoMode === 'with_memory' ? 'bg-teal-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'}`}
+                      >
+                        🧠 Hindsight Memory ON
+                      </button>
+                      <button
+                        onClick={() => {
+                          setHindsightDemoMode('baseline_no_memory');
+                          showToast('Switched to Baseline Agent (Stateless / No Memory).', 'info');
+                        }}
+                        className={`px-3 py-1 rounded-lg font-bold text-xs transition ${hindsightDemoMode === 'baseline_no_memory' ? 'bg-slate-800 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'}`}
+                      >
+                        Stateless Baseline
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Starter Prompts */}
+                  <div className="flex items-center gap-2 text-xs flex-wrap">
+                    <span className="text-slate-400 font-bold uppercase text-[10px]">Starter Queries:</span>
+                    {[
+                      'Has SEC-014 been a problem before?',
+                      'What are the highest risk findings?',
+                      'Any overdue actions?',
+                      'What happened last time in IT Operations?'
+                    ].map(q => (
+                      <button
+                        key={q}
+                        onClick={() => handleChatSubmit(q)}
+                        className="px-3 py-1 bg-white hover:bg-teal-50 border border-slate-200 text-slate-700 hover:text-teal-900 rounded-full font-medium shadow-2xs text-xs"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Chat message history */}
+                  <div className="flex-1 bg-white rounded-xl border border-slate-200 p-5 overflow-y-auto space-y-4 shadow-xs">
+                    {chatMessages.map(m => (
+                      <div key={m.id} className={`flex gap-3 max-w-3xl ${m.sender === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 ${m.sender === 'user' ? 'bg-slate-900' : 'bg-teal-600 shadow-md shadow-teal-600/30'}`}>
+                          {m.sender === 'user' ? 'You' : 'AI'}
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className={`p-4 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap ${m.sender === 'user' ? 'bg-slate-900 text-white rounded-tr-none' : 'bg-slate-50 border border-slate-200 text-slate-800 rounded-tl-none'}`}>
+                            {m.text}
+                          </div>
+
+                          {m.references && m.references.length > 0 && (
+                            <div className="flex gap-2 flex-wrap pt-1">
+                              {m.references.map((r, i) => (
+                                <button
+                                  key={i}
+                                  onClick={() => openDrawer(r.doc, r.page, r.excerpt, r.label)}
+                                  className="text-[11px] font-bold bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-300 px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-2xs"
+                                >
+                                  📄 {r.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Input form */}
+                  <form onSubmit={(e) => { e.preventDefault(); handleChatSubmit(); }} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder="Ask Audit Assistant with historical memory..."
+                      className="flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-xs bg-white focus:ring-2 focus:ring-teal-500 shadow-xs"
+                    />
+                    <button type="submit" className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-xs">
+                      Send
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* TAB 10: HINDSIGHT MEMORY EXPLORER (SECTION 8 RECOMMENDED DEMO SCREEN!) */}
+              {activeTab === 'memory' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="pb-2 border-b border-slate-200 flex justify-between items-center">
+                    <div>
+                      <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+                        <span>🧠</span> Hindsight Memory Explorer
+                      </h1>
+                      <p className="text-xs text-slate-500">Live inspection of retained audit memories, reflections, and cross-cycle organizational recall</p>
+                    </div>
+                    <span className="text-xs font-mono font-bold bg-teal-50 text-teal-800 px-3 py-1 rounded-lg border border-teal-300">
+                      Bank: abctech-audit-memory ({memories.length} memories retained)
+                    </span>
+                  </div>
+
+                  {/* Retain, Recall, Reflect Architecture Overview */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs space-y-1">
+                      <div className="font-extrabold text-teal-800 uppercase text-[11px] flex items-center gap-1.5">
+                        <span>📥</span> Hindsight Retain
+                      </div>
+                      <p className="text-slate-600 leading-relaxed">
+                        Stores approved findings, remediation outcomes, and policy changes with rich metadata tags (organisation_id, control_id, department, audit_period).
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs space-y-1">
+                      <div className="font-extrabold text-blue-800 uppercase text-[11px] flex items-center gap-1.5">
+                        <span>🔍</span> Hindsight Recall
+                      </div>
+                      <p className="text-slate-600 leading-relaxed">
+                        When a new finding or question arises, recalls past audit memories matching control ID, department, or issue context across prior cycles.
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs space-y-1">
+                      <div className="font-extrabold text-purple-800 uppercase text-[11px] flex items-center gap-1.5">
+                        <span>💡</span> Hindsight Reflect
+                      </div>
+                      <p className="text-slate-600 leading-relaxed">
+                        Synthesizes retrieved history to detect recurring patterns and advise human reviewers whether an issue was truly resolved or merely patched.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Search and Recall Simulation in Memory Explorer */}
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
+                    <div className="flex flex-wrap items-center gap-3 text-xs">
+                      <span className="font-bold text-slate-700 whitespace-nowrap">🔍 Search & Test Recall:</span>
+                      <input
+                        type="text"
+                        value={memorySearchQuery}
+                        onChange={(e) => setMemorySearchQuery(e.target.value)}
+                        placeholder="Filter by keyword (e.g. SEC-014, IT Operations, spreadsheet, recurrence)..."
+                        className="flex-1 min-w-[200px] rounded-lg border border-slate-300 px-3 py-1.5 text-xs bg-slate-50 focus:bg-white focus:ring-1 focus:ring-teal-500"
+                      />
+                      {memorySearchQuery && (
+                        <button onClick={() => setMemorySearchQuery('')} className="text-xs text-rose-600 hover:text-rose-800 font-bold cursor-pointer">
+                          Clear
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs flex-wrap">
+                      <span className="text-[10px] uppercase font-bold text-slate-400">Recall Presets:</span>
+                      {['SEC-014 Recurrence', 'IT Operations', 'Access Review', 'Spreadsheet Patch'].map(term => (
+                        <button
+                          key={term}
+                          onClick={() => setMemorySearchQuery(term)}
+                          className="px-2.5 py-0.5 rounded-full bg-slate-100 hover:bg-teal-50 hover:text-teal-900 border border-slate-200 text-slate-600 text-[11px] font-medium cursor-pointer"
+                        >
+                          {term}
+                        </button>
+                      ))}
+                      {memorySearchQuery && (
+                        <button
+                          onClick={() => setMemorySearchQuery('')}
+                          className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-bold cursor-pointer"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Retained Memories List */}
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                    <div className="p-4 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-700 flex justify-between">
+                      <span>Retained Memory Records ({memories.filter(m => !memorySearchQuery || m.summary.toLowerCase().includes(memorySearchQuery.toLowerCase()) || m.narrative.toLowerCase().includes(memorySearchQuery.toLowerCase()) || m.control_id.toLowerCase().includes(memorySearchQuery.toLowerCase()) || m.department.toLowerCase().includes(memorySearchQuery.toLowerCase())).length})</span>
+                      <span className="text-[11px] text-slate-400">Isolated to tenant ABC Technologies</span>
+                    </div>
+
+                    <div className="divide-y divide-slate-100">
+                      {memories
+                        .filter(m => !memorySearchQuery || m.summary.toLowerCase().includes(memorySearchQuery.toLowerCase()) || m.narrative.toLowerCase().includes(memorySearchQuery.toLowerCase()) || m.control_id.toLowerCase().includes(memorySearchQuery.toLowerCase()) || m.department.toLowerCase().includes(memorySearchQuery.toLowerCase()))
+                        .map(mem => (
+                        <div key={mem.id} className="p-5 hover:bg-slate-50 transition space-y-2">
+                          <div className="flex flex-wrap justify-between items-center gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs font-bold bg-slate-900 text-white px-2 py-0.5 rounded">
+                                {mem.control_id}
+                              </span>
+                              <span className="text-xs font-bold text-slate-900">{mem.summary}</span>
+                              <span className="text-[10px] uppercase font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                                {mem.category}
+                              </span>
+                            </div>
+                            <span className="text-[11px] font-mono text-slate-500 font-semibold">{mem.audit_period}</span>
+                          </div>
+
+                          <p className="text-xs text-slate-700 leading-relaxed font-medium">
+                            {mem.narrative}
+                          </p>
+
+                          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px] space-y-1">
+                            <div className="text-purple-900 font-bold">Reflected Context:</div>
+                            <div className="text-slate-600 italic">"{mem.reflection}"</div>
+                            <div className="text-slate-400 pt-1 font-mono">Source Reference: {mem.source_ref}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </main>
+          </div>
+
+          {/* APPROVE FINDING CONFIRMATION MODAL */}
+          {approveModalOpen && selectedFinding && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-fade-in border border-slate-200">
+                <div className="flex items-center gap-2.5 text-slate-900 font-extrabold text-base">
+                  <span className="text-teal-600 text-xl">🛡️</span>
+                  <span>Confirm Finding Approval</span>
+                </div>
+
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Approving finding <strong>#{selectedFinding.id}</strong> ({selectedFinding.control_code}) will:
+                </p>
+
+                <ul className="text-xs text-slate-700 space-y-1.5 list-disc pl-5">
+                  <li>Promote from <strong>Draft AI Suggestion</strong> to <strong>Approved Authoritative Record</strong>.</li>
+                  <li>Write an immutable entry into <code className="font-mono text-slate-900">status_history</code> table.</li>
+                  <li>Trigger <strong>Hindsight Retain</strong> to preserve this audit context in the organisation memory bank.</li>
+                  <li>Scan prior cycles for recurring weaknesses.</li>
+                </ul>
+
+                <div className="pt-3 border-t border-slate-100 flex justify-end gap-2 text-xs">
+                  <button
+                    onClick={() => setApproveModalOpen(false)}
+                    className="px-4 py-2 rounded-lg border border-slate-300 font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleApproveFinding(selectedFinding.id)}
+                    className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 font-bold text-white shadow-xs"
+                  >
+                    Confirm & Approve
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SOURCE DRAWER (SLIDE-OVER FROM RIGHT) */}
+          {sourceDrawer.isOpen && (
+            <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex justify-end animate-fade-in">
+              <div className="w-full max-w-lg bg-white h-full shadow-2xl flex flex-col border-l border-slate-200 animate-slide-right">
+                <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
+                  <div>
+                    <h3 className="font-bold text-sm">Source Document Evidence Viewer</h3>
+                    <p className="text-xs text-slate-400">{sourceDrawer.doc} • Page {sourceDrawer.page}</p>
+                  </div>
+                  <button
+                    onClick={() => setSourceDrawer({ ...sourceDrawer, isOpen: false })}
+                    className="text-slate-400 hover:text-white text-lg font-bold p-1 rounded"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="p-6 space-y-5 overflow-y-auto flex-1 bg-slate-50/50">
+                  <div className="bg-teal-50 border-2 border-teal-500/40 p-4 rounded-xl space-y-1">
+                    <span className="text-[10px] font-bold text-teal-800 uppercase block">Extracted Cited Excerpt</span>
+                    <blockquote className="text-xs font-semibold text-slate-800 italic border-l-4 border-teal-600 pl-3 py-1 bg-white rounded">
+                      "{sourceDrawer.excerpt}"
+                    </blockquote>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-2">
+                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase">
+                      <span>PyMuPDF Extracted Raw Page Content</span>
+                      <span>Page {sourceDrawer.page}</span>
+                    </div>
+
+                    <div className="font-mono text-xs text-slate-700 leading-relaxed whitespace-pre-wrap bg-slate-50 p-4 rounded-lg border border-slate-100">
+{`============================================================
+ABC TECHNOLOGIES — INTERNAL AUDIT ASSURANCE REPORT (2026)
+SECTION: 4.1 ACCESS MANAGEMENT & CONTROL TESTING
+CONTROL CODE: ${sourceDrawer.controlCode || 'SEC-014'}
+============================================================
+
+Auditor Observations:
+${sourceDrawer.excerpt}
+
+Audit Testing Steps:
+1. Inspected quarterly user access review spreadsheets provided by IT Operations.
+2. Verified manager sign-off signatures for privileged AWS IAM and database access roles.
+3. Cross-referenced human resource leavers list against active user directories.
+
+Findings Summary:
+- Timely quarterly access review SLA was missed by >45 days.
+- 3 terminated contractors retained active VPN profile markers.
+- Prior corrective action REM-2026-014-01 was only partially effective.
+
+Classification: High Severity Defect (Recurrence Pattern Identified)`}
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] text-slate-500 bg-slate-100 p-3 rounded-lg">
+                    🔒 Untrusted Input Notice: Document text is extracted safely via PyMuPDF and presented verbatim for human auditor verification.
+                  </div>
+                </div>
+
+                <div className="p-4 border-t border-slate-200 bg-white flex justify-end">
+                  <button
+                    onClick={() => setSourceDrawer({ ...sourceDrawer, isOpen: false })}
+                    className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    Close Viewer
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
